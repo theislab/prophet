@@ -1,0 +1,26 @@
+setting: NULL
+leaveout_method: NULL
+dirpath: 'null'
+
+project_name: FT_Prophet
+pert_len: 2
+ckpt_path: /prophet_ckpts/iv_0_iv_out_multitest_300cl_1219iv_512model_8layers_Falsesimpler_Truemask_0.0001lr_Falseexplicitphenotype_20000warmup_150000max_iters_Trueunbalanced_0.01wd_4096bs_Falseft
+fine_tune: True
+
+genes_prior: ['./embeddings/global_iv_scaledv3.csv',
+'./embeddings/CTRP_with_smiles_simscaled.csv',
+'./embeddings/Hadian_plates_NEW_simscaled.csv']
+max_steps: 20000
+batch_size: 256
+
+Transformer:
+  simpler: False
+  num_layers: 8
+  num_heads: 8
+  model_dim: 512
+  max_iters: 40000
+  dim_iv: 1219
+  warmup: 5000
+  iv_dropout: 0.1
+  cl_dropout: 0.1
+  ph_dropout: 0.1
