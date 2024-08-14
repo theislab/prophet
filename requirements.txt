@@ -2,12 +2,10 @@ joblib==1.4.2
 numpy==2.0.1
 pandas==1.5.3
 pytorch_lightning==2.1.0
-PyYAML==6.0.1
 PyYAML==6.0.2
 scikit_learn==1.5.1
 scipy==1.14.0
 torch==2.3.0
 torchmetrics==1.4.0.post0
 tqdm==4.66.4
-python==3.12.3§
 wandb==0.17.6

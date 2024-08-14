@@ -7,7 +7,7 @@ from dataloader import dataloader_phenotypes, get_split_indices, get_data_by_set
 from train import train_transformer
 from model import load_models_config
 import pytorch_lightning as pl
-from config import set_config
+from prophet.config import set_config
 import os
 import yaml
 

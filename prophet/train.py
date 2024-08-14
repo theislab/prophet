@@ -1,12 +1,10 @@
 from model import TransformerPredictor
-from callbacks import R2ScoreCallback
+from prophet.callbacks import R2ScoreCallback
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 from torchmetrics.regression import R2Score
 import torch
-from tqdm import tqdm
-from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
 import wandb
 import os
 

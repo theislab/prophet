@@ -3,7 +3,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from torch import optim
 import torch.nn.init as init
-from callbacks import CosineWarmupScheduler
+from prophet.callbacks import CosineWarmupScheduler
 
 from tqdm import tqdm
 
