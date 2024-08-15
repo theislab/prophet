@@ -4,20 +4,19 @@ import pytorch_lightning as pl
 import numpy as np
 import pandas as pd
 import warnings
+from tqdm import tqdm
+from typing import List, Union, Dict, Optional
+from itertools import permutations
+import functools
 from pathlib import Path
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
-from dataloader import (
+from .dataloader import (
     dataloader_phenotypes,
     process_priors,
     remove_nonexistent_cat,
 )
-from model import load_models_config, TransformerPredictor
-from tqdm import tqdm
-from typing import List, Union, Dict, Optional
-from itertools import permutations
-
-import functools
+from .model import load_models_config, TransformerPredictor
 
 def inherit_docs_and_signature(from_method):
     def decorator(to_method):
@@ -52,6 +51,8 @@ class Prophet:
         self.iv_emb_path = iv_emb_path
         self.cl_emb_path = cl_emb_path
         self.ph_emb_path = ph_emb_path
+        # set phenotypes (must be in the same order regardless of what is passed in predict)
+        self.phenotypes = list(pd.read_csv('./embeddings/phenotypes.csv', index_col=0).values.flatten())
         self.column_map = None
         self.pert_len = None
 
@@ -60,10 +61,9 @@ class Prophet:
         else:
             self.model_pth = model_pth
             self.model = self._build_model(architecture)
-            self.iv_embedding, self.cl_embedding, self.ph_embedding = self._get_emb_data(iv_emb_path=self.iv_emb_path, cl_emb_path=self.cl_emb_path, ph_emb_path=self.ph_emb_path)
+            self.iv_embedding, self.cl_embedding, self.ph_embedding = process_priors(self.iv_emb_path, self.cl_emb_path, self.ph_emb_path)
             if self.model.hparams.explicit_phenotype and self.ph_embedding is None:
                 raise ValueError('model was run with explicit phenotype! must pass a ph_emb_path')
-
 
     def _build_model(self, arch):
         if arch == "RandomForest":
@@ -85,22 +85,13 @@ class Prophet:
         else:
             raise ValueError(arch, " is not a valid model architecture.")
 
-    def _get_emb_data(
-        self,
-        iv_emb_path: List[str] = None,
-        cl_emb_path: List[str] = None,
-        ph_emb_path: List[str] = None,
-    ):
-
-        return process_priors(iv_emb_path, cl_emb_path, ph_emb_path)
-
     def _remove_nonexistent_cat(
         self,
         data_label: Optional[pd.DataFrame] = None,
         verbose=True,
     ):
         embeddings = [self.iv_embedding, self.cl_embedding, self.ph_embedding]
-        cols = [self.iv_cols, self.environment_col, self.phenotype_col]
+        cols = [self.iv_cols, self.cl_col, self.ph_col]
         for i, embedding in enumerate(embeddings):
             if embedding is None:  # phenotype embedding can be None
                 continue
@@ -112,89 +103,75 @@ class Prophet:
             raise ValueError('labels did not match embeddings passed!')
         return data_label
 
-    def flip_iv_cols(
+    def _init_input(
         self,
-        df: pd.DataFrame
-        ):
-        if len(self.iv_cols) > 1:
-            flipped_dfs = []
-            for perm in permutations(self.iv_cols):
-                df_flipped = df.copy()
-                # Reorder the columns according to the current permutation
-                for orig_col, new_col in zip(self.iv_cols, perm):
-                    df_flipped[new_col] = df[orig_col]
-                flipped_dfs.append(df_flipped)
+        iv_col: Union[List[str], str] = ['iv1', 'iv2'],
+        cl_col: str = "cell_line",
+        ph_col: str = "phenotype",
+        readout_col: str = "value",
+    ):
+        """Sets some state variables in the model, but is always overwritten by
+        either train or predict.
+        """
+        if isinstance(iv_col, str):
+            iv_col = [iv_col]
+        intervention_mapping = {col: f"iv{i+1}" for i, col in enumerate(iv_col)}
+        self.iv_cols = list(intervention_mapping.values())
 
-            # Concatenate the original DataFrame with all flipped versions
-            df = pd.concat([df] + flipped_dfs, axis=0, ignore_index=True)
-            return df
-        
+        # store the columns used for training for reference
+        self.cl_col = cl_col
+        self.ph_col = ph_col
+        self.readout_col = readout_col
+
+        # create the mapping to the internal variables used
+        self.column_map = {
+            self.cl_col: "cell_line",
+            self.ph_col: "phenotype",
+            self.readout_col: "value",
+            **intervention_mapping
+        }
+        if self.pert_len is None:
+            self.pert_len = len(self.iv_cols)
+        else:
+            if self.pert_len != len(self.iv_cols):
+                raise ValueError(f"Are you sure you passed the right number of intervention columns? Currently receiving {self.iv_cols}")
+
     def train(
         self,
         df: pd.DataFrame,
         iv_col: Union[List[str], str] = ['iv1', 'iv2'],
-        environment_col: str = "cell_line",
-        phenotype_col: str = "phenotype",
+        cl_col: str = "cell_line",
+        ph_col: str = "phenotype",
         readout_col: str = "value",
-        flip_iv_col: bool = False,
     ):
         """Train the Prophet model on the provided DataFrame.
 
         This function reformats the DataFrame according to the specified settings and intervention columns,
         then trains the model using the reformatted data.
 
+        Warning: this has not yet been compared to train_model.py, use at your own risk.
+
         Args:
             df (pd.DataFrame): The DataFrame containing the experimental data.
             iv_col (Union[List[str], str]): The names of the intervention columns in the DataFrame. Can be a single column name or a list of names.
-            environment_col (str, optional): The name of the column in df that contains the setting labels. Defaults to "cell_line".
-            phenotype_col (str, optional): The name of the column in df that contains the phenotype labels. Defaults to "phenotype".
+            cl_col (str, optional): The name of the column in df that contains the setting labels. Defaults to "cell_line".
+            ph_col (str, optional): The name of the column in df that contains the phenotype labels. Defaults to "phenotype".
             readout_col (str, optional): The name of the column in df that contains the readout data. Defaults to "value".
             flip_iv_col (bool, optional): Whether to flip the intervention columns for data augmentation. Defaults to False. If using the Transformer architecture, should be turned off to save memory.
         """
-        # set phenotypes (must be in the same order regardless of what is passed in predict)
-        self.phenotypes = list(df[phenotype_col].unique())
-
-        # Set intervention columns
-        if isinstance(iv_col, str):
-            iv_col = [iv_col]
-        # Set single or multiple intervention flag
-        self.is_single = len(iv_col) == 1
-        if not iv_col or len(iv_col) < 1 or len(iv_col) > 3:
-            raise ValueError("Number of interventions must be between 1 and 3.")
-
-        self.environment_col = environment_col
-        self.phenotype_col = phenotype_col
-        self.readout_col = readout_col
-        self.column_map = {
-            self.environment_col: "cell_line",
-            self.phenotype_col: "phenotype",
-            self.readout_col: "value",
-        }
-
-        # Create intervention column mapping
-        intervention_mapping = {col: f"iv{i+1}" for i, col in enumerate(iv_col)}
-        self.column_map.update(intervention_mapping)
-        self.iv_cols = [intervention_mapping[iv] for iv in iv_col]
-        if self.pert_len is None:
-            self.pert_len = len(self.iv_cols)
-        else:
-            if self.pert_len != len(self.iv_cols):
-                raise ValueError(f"Are you sure you passed the right number of intervention columns? Currently only {self.iv_cols}")
-
+        self._init_input(iv_col, cl_col, ph_col, readout_col)
+        # user-friendly check that the columns were passed in correctly
         for _, (old_name, new_name) in enumerate(self.column_map.items()):
             if old_name not in df.columns:
                 raise ValueError(f"{old_name} not in df columns.")
-            if old_name != new_name:
-                print(f"Rename column [{old_name}] to [{new_name}]")
-        df = df.rename(columns=self.column_map)
 
-        if flip_iv_col:
-            df = self.flip_iv_cols(df)
-        # Remove duplicate rows
+        df = df.rename(columns=self.column_map).copy()
+
+        # Formatting
         df = df.drop_duplicates()
         df = df.reset_index(drop=True)
 
-        ## generate data
+        ## generate training dataloader
         df = self._remove_nonexistent_cat(data_label=df, verbose=False)
         split = dataloader_phenotypes(
             gene_embedding=self.iv_embedding,
@@ -217,7 +194,7 @@ class Prophet:
             X_train, y_train = split[2]
             self.model.fit(X_train, y_train)
         else:
-            print('pytorch model, already fit')
+            print('pytorch model, already fit')  # train does not currently support finetuning
             pass
             #self.model.fit(split[2])  # TODO: convert train_transformer to this or something
 
@@ -281,84 +258,77 @@ class Prophet:
         target_ivs: Union[str, List[str]] = None,
         target_cls: Union[str, List[str]] = None,
         target_phs: Union[str, List[str]] = None,
+        iv_col: Union[List[str], str] = ['iv1', 'iv2'],
+        cl_col: str = "cell_line",
+        ph_col: str = "phenotype",
         num_iterations: int = None,
         save: bool = True,
-        filename: str = None,  # TODO: if None, the predictions should not be saved
+        filename: str = "Prophet_prediction",
     ):
         """Predict outcomes using the trained Prophet model.
 
         This function can take either a DataFrame or a combination of gene and cell line lists to make predictions.
-        The predictions are saved to a specified file.
+        If a dataframe is passed, which columns correspond to which inputs must also be passed. If lists are passed,
+        all combinations within are taken (not including combinations).
 
         Args:
             df (pd.DataFrame, optional): The DataFrame containing the data for prediction. If None, predictions will be made for all combinations of provided genes and cell lines.
-            target_ivs (Union[str, List[str]], optional): The intervention or list of interventions for prediction. If df and target_ivs are both None, predictions will be made for all interventions in the training data.
-            target_cls (Union[str, List[str]], optional): The cell line or list of cell lines for prediction. If df and target_cls are both None, predictions will be made for all cell lines in the training data.
+            target_ivs (Union[str, List[str]], optional): The intervention or list of interventions for prediction. If df and target_ivs are both None, predictions will be made for all available treatments.
+            target_cls (Union[str, List[str]], optional): The cell line or list of cell lines for prediction. If df and target_cls are both None, predictions will be made for all available cell lines.
             target_phs (Union[str, List[str]], optional): The phenotype for prediction. If None, it will be set to "_". 
             num_iterations (int, optional): The number of iterations to run the prediction. If None, it will be calculated automatically.
             save (bool, optional): Whether to save the prediction results to a file. If False, return the prediction result as dataframe. Defaults to True.
             filename (str, optional): The filename to save the prediction results. If None, a default name will be used.
         """
-
         if save:
-            if filename is None:
-                filename = "Prophet_prediction"
             print(f"Saving results to {filename}.parquet")
-
-        if self.column_map is None:
-            raise ValueError("Dataset columns have not been set! Please run .fit even if the model has been trained.")
 
         # If only pass target_cls and target_ivs
         if df is None:
-            if target_cls is None:
-                target_cls = list(self.cl_embedding.index)
-                warnings.warn(f"Trying to predict for all cell lines that are from {self.cl_embedding.index}!")
-                print(f"There are {len(target_cls)} cell lines in total!")
 
             if isinstance(target_cls, str):
                 target_cls = [target_cls]
             if isinstance(target_phs, str):
                 target_phs = [target_phs]
+            if isinstance(target_ivs, str):
+                target_ivs = [target_ivs]
             
+            if target_cls is None:
+                target_cls = list(self.cl_embedding.index)
+                warnings.warn(f"Trying to predict for all cell lines that are from {self.cl_embedding.index}!")
+                print(f"There are {len(target_cls)} cell lines in total!")
             if target_ivs is None:
                 target_ivs = list(self.iv_embedding.drop_duplicates().index)  # because there compounds with the same embedding but different
                 warnings.warn(f"Trying to predict for all gene combinations that are from {self.iv_embedding.index}!")
                 print(f"There are {len(target_ivs)} genes in total!")
-            
-            if isinstance(target_ivs, str):
-                target_ivs = [target_ivs]
-            """
-            if "negative" not in target_ivs:
-                subset_iv.loc[len(subset_iv)] = ["negative"]
-            """
-            if len(self.iv_cols) == 1:
-                total_size = len(target_ivs) * len(target_ivs)
-            elif len(self.iv_cols) == 2:
-                total_size = pow(len(target_ivs), len(self.iv_cols)) * len(target_cls)
-            else:
-                raise NotImplementedError("Only support 1 or 2 interventions if you input a list of interventions. Please create the data label dataframe yourself and input to predict()!")
+
+            # in case the user wants to specify more than one intervention
+            if iv_col is None:
+                iv_col = ['iv1']
+
+            total_size = len(target_ivs) * len(target_cls) * len(target_phs)
+            self._init_input(iv_col, 'cell_line', 'phenotype', 'value')  # since we're constructing it ourselves
         # or pass a dataframe has similiar format with in train
         else:
-            
-            df = df.copy()
-            column_map_without_readout_col = {key : value for key, value in self.column_map.items() if key not in (self.readout_col)}
-            for _, (old_name, new_name) in enumerate(column_map_without_readout_col.items()):
+            self._init_input(iv_col, cl_col, ph_col, 'value')
+            # user-friendly column name check
+            for _, (old_name, new_name) in enumerate(self.column_map.items()):
+                if new_name == 'value':  # prediction does not need a readout col
+                    continue
                 if old_name not in df.columns:
                     raise ValueError(f"{old_name} not in df columns.")
-                if old_name != new_name:
-                    print(f"Rename column [{old_name}] to [{new_name}]")
-            df = df.rename(columns=column_map_without_readout_col)
 
-            # Remove duplicate rows
+            df = df.rename(columns=self.column_map).copy()
+
+            # same formatting as in train
             df = df.drop_duplicates()
             df = df.reset_index(drop=True)
             df = self._remove_nonexistent_cat(data_label=df, verbose=False)
             total_size = len(df)
         
-        # Divide work into partitions
+        # Divide work into partitions. This allows users to run a large amount of inference
+        # in one shot without memory problems.
         if num_iterations:
-            
-            pass
             if num_iterations < 1:
                 raise KeyError("num_iterations must be larger than 0.")
             else:

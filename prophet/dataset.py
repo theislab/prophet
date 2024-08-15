@@ -56,11 +56,10 @@ class PhenotypeDataset(Dataset):
         
         self.pert_len = pert_len
         
-        print("Interventions: ", self.iv.shape)
-        print("Cell line: ", self.cell_line.shape)
-        print("Order of phenotypes: ", phenotypes)
-        
-        print("Don't using explicit phenotype embeddings") if self.phenotype_embeddings is None else print(f"Explicit phenotype {self.phenotype_embeddings.shape} was passed")
+        # print("Interventions: ", self.iv.shape)
+        # print("Cell line: ", self.cell_line.shape)
+        # print("Order of phenotypes: ", phenotypes)
+        # print("Don't using explicit phenotype embeddings") if self.phenotype_embeddings is None else print(f"Explicit phenotype {self.phenotype_embeddings.shape} was passed")
 
     def __len__(self):
         return len(self.experimental_data)
