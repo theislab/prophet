@@ -1,5 +1,5 @@
 joblib==1.4.2
-numpy==2.0.1
+numpy==1.26.4
 pandas==1.5.3
 pytorch_lightning==2.1.0
 PyYAML==6.0.2

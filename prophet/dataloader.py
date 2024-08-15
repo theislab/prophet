@@ -1,6 +1,5 @@
 from sklearn.model_selection import LeaveOneGroupOut, KFold
 from torch.utils.data import DataLoader
-from dataset import PhenotypeDataset
 from typing import Literal, List, Tuple, Optional
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import numpy as np
@@ -8,6 +7,7 @@ import warnings
 import pandas as pd
 from functools import reduce
 import math
+from .dataset import PhenotypeDataset
 
 SEED = 42  # the true, baseline seed (that sets test splits)
 
@@ -15,8 +15,6 @@ def _choose(a, size, seed):
     """Guaranteed deterministic choosing."""
     np.random.seed(seed)  # reset the generator
     return np.random.choice(a, size=size, replace=False)
-
-
 
 def dataloader_phenotypes(
     gene_embedding: List[pd.DataFrame],
