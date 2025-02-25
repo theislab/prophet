@@ -13,7 +13,7 @@ pip install -e .
 
 ## Usage
 
-Model checkpoints and input embeddings can be downloaded [here](https://data.mendeley.com/datasets/hzvhmd6jvt) and [here](https://data.mendeley.com/datasets/g7z3pw3bfw). Examples for how to query the results of various experiments can be found at [tutorial.ipynb](https://github.com/theislab/prophet/blob/main/tutorial.ipynb).
+Model checkpoints and input embeddings can be downloaded [here](https://huggingface.co/datasets/aletlvl/Prophet_v1/tree/main) and [here](https://data.mendeley.com/datasets/g7z3pw3bfw). Examples for how to query the results of various experiments can be found at [tutorial.ipynb](https://github.com/theislab/prophet/blob/main/tutorial.ipynb).
 
 If you have used our work in your research, please cite our [preprint](https://www.biorxiv.org/content/10.1101/2024.08.12.607533v2).
 
