@@ -31,9 +31,9 @@ def inherit_docs_and_signature(from_method):
 class Prophet:
     def __init__(
         self,
-        iv_emb_path: Union[str, List[str]] = None,  # TODO default values
-        cl_emb_path: Union[str, List[str]] = None,  # TODO default values
-        ph_emb_path: Union[str, List[str]] = None,  # TODO default values
+        iv_emb_path: Union[str, List[str]] = None,
+        cl_emb_path: Union[str, List[str]] = None,
+        ph_emb_path: Union[str, List[str]] = None,
         model_pth=None,
         architecture="Transformer",
     ):
@@ -196,7 +196,6 @@ class Prophet:
         else:
             print('pytorch model, already fit')  # train does not currently support finetuning
             pass
-            #self.model.fit(split[2])  # TODO: convert train_transformer to this or something
 
     def _generate_predict_df(self,
                              run_index: int,
@@ -229,7 +228,7 @@ class Prophet:
         else:
             data_label = pd.merge(subset_iv[["iv"]], data_label, how="cross", suffixes=("1", "2"))
             # A+B and B+A should be the same, so we remove all duplicates in favor of A+B (was pretty sure this shouldn't exist in the implementation @John)
-            data_label['iv1+iv2'] = ['+'.join(sorted([row['iv1'], row['iv2']])) for _, row in data_label.iterrows()] # TODO: make sure that these column names at least always exist, probably in some variable somewhere
+            data_label['iv1+iv2'] = ['+'.join(sorted([row['iv1'], row['iv2']])) for _, row in data_label.iterrows()]
             data_label = data_label.drop_duplicates(subset=['iv1+iv2', 'cell_line', 'phenotype'])
         
         data_label['value'] = '_'
@@ -242,9 +241,6 @@ class Prophet:
         single_run_size: int = None,
         memory_size: int = None,
     ):
-
-        # TODO decide single_run_size based on memory_size
-
         if total_size <= single_run_size:
             num_iterations = 1
         else:
@@ -359,7 +355,7 @@ class Prophet:
             else:
                 data_label = self._generate_predict_df(run_index=run_index,num_iterations=num_iterations,target_ivs=target_ivs,target_cls=target_cls, target_phs=target_phs)
 
-            data_label = data_label.drop_duplicates()  # TODO should be able to remove
+            data_label = data_label.drop_duplicates()
 
             data_label = self._remove_nonexistent_cat(data_label=data_label, verbose=not isinstance(df, pd.DataFrame))
             
