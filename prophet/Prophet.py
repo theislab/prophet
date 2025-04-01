@@ -1,22 +1,24 @@
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 import numpy as np
 import pandas as pd
 import warnings
 from tqdm import tqdm
 from typing import List, Union, Dict, Optional
 from itertools import permutations
+from prophet.callbacks import R2ScoreCallback
 import functools
 from pathlib import Path
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
-from .dataloader import (
+from prophet.dataloader import (
     dataloader_phenotypes,
     process_priors,
     remove_nonexistent_cat,
 )
-from .model import load_models_config, TransformerPredictor
+from prophet.model import load_models_config, TransformerPredictor
 
 def inherit_docs_and_signature(from_method):
     def decorator(to_method):
@@ -143,13 +145,12 @@ class Prophet:
         cl_col: str = "cell_line",
         ph_col: str = "phenotype",
         readout_col: str = "value",
+        model_config: dict = None,
     ):
         """Train the Prophet model on the provided DataFrame.
 
         This function reformats the DataFrame according to the specified settings and intervention columns,
         then trains the model using the reformatted data.
-
-        Warning: this has not yet been compared to train_model.py, use at your own risk.
 
         Args:
             df (pd.DataFrame): The DataFrame containing the experimental data.
@@ -157,7 +158,7 @@ class Prophet:
             cl_col (str, optional): The name of the column in df that contains the setting labels. Defaults to "cell_line".
             ph_col (str, optional): The name of the column in df that contains the phenotype labels. Defaults to "phenotype".
             readout_col (str, optional): The name of the column in df that contains the readout data. Defaults to "value".
-            flip_iv_col (bool, optional): Whether to flip the intervention columns for data augmentation. Defaults to False. If using the Transformer architecture, should be turned off to save memory.
+            model_config (dict, optional): Configuration yaml, e.g. config_file_finetuning
         """
         self._init_input(iv_col, cl_col, ph_col, readout_col)
         # user-friendly check that the columns were passed in correctly
@@ -194,9 +195,62 @@ class Prophet:
             X_train, y_train = split[2]
             self.model.fit(X_train, y_train)
         else:
-            print('pytorch model, already fit')  # train does not currently support finetuning
-            pass
+            print("pytorch model, finetuning")
+            # automatically take 10% of the data as validation set
+            train_indices = np.array(df.index)[np.random.choice(len(df.index), int(len(df.index) * 0.9), replace=False)]
+            val_indices = np.array(df.index)[~np.isin(df.index, train_indices)]
+            split = dataloader_phenotypes(
+                gene_embedding=self.iv_embedding,
+                cell_lines_embedding=self.cl_embedding,
+                phenotype_embedding=self.ph_embedding if self.ph_embedding is not None else None,
+                data_label=df,
+                label_name="value",
+                index=(
+                    train_indices,
+                    val_indices,
+                    [],
+                    "",
+                ),  # (train, val, test, descr)
+                torch_dataset=self.torch_dataset,
+                pert_len=len(self.iv_cols),
+                valid_set=True
+            )
 
+            models_config.ohe_dim = 0  # relic of ohe
+            # phenotypes = data[-1] # ordered list of phenotypes
+
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            model, models_config = load_models_config(models_config, seed=42, phenotypes=None) 
+        
+            lr_monitor = LearningRateMonitor(logging_interval='step')
+            dirpath = './ckpts/'
+            model_checkpointer = ModelCheckpoint(dirpath=dirpath, save_top_k=1, every_n_epochs=1, monitor='R2', mode='max')
+            r2_callback = R2ScoreCallback(device=model.device, average=False)
+            early_stopping = EarlyStopping(monitor="R2", mode="max", patience=model_config.patience, min_delta=0.0)
+            
+            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
+            
+            print(f"Running with early stopping: {model_config.early_stopping}")
+            if model_config.early_stopping:
+                print(f"Early stopping patience: {model_config.patience}")
+            
+            trainer = pl.Trainer(
+                min_epochs=1,
+                #max_steps=100,
+                max_steps=model_config.max_steps,
+                #max_epochs=9,
+                accelerator='gpu',
+                # devices=int(os.environ.get('SLURM_NTASKS_PER_NODE', 1)),
+                check_val_every_n_epoch=1,
+                callbacks=callbacks,
+                # logger=wandb_logger,
+                strategy="ddp",
+                #precision="16-mixed",
+                gradient_clip_val=1,
+                deterministic=True)
+
+            trainer.fit(model=model, train_dataloaders=split)
+            
     def _generate_predict_df(self,
                              run_index: int,
                              num_iterations: int,
