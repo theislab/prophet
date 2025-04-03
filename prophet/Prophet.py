@@ -216,11 +216,11 @@ class Prophet:
                 valid_set=True
             )
 
-            models_config.ohe_dim = 0  # relic of ohe
+            model_config.ohe_dim = 0  # relic of ohe
             # phenotypes = data[-1] # ordered list of phenotypes
 
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            model, models_config = load_models_config(models_config, seed=42, phenotypes=None) 
+            model, model_config = load_models_config(model_config, seed=42, phenotypes=None) 
         
             lr_monitor = LearningRateMonitor(logging_interval='step')
             dirpath = './ckpts/'
