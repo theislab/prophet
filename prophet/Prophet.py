@@ -14,12 +14,13 @@ import functools
 from pathlib import Path
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
-from prophet.dataloader import (
+from dataloader import (
     dataloader_phenotypes,
     process_priors,
     remove_nonexistent_cat,
 )
 from model import load_models_config, TransformerPredictor
+from pytorch_lightning.callbacks import TQDMProgressBar
 
 def inherit_docs_and_signature(from_method):
     def decorator(to_method):
@@ -230,7 +231,8 @@ class Prophet:
             r2_callback = R2ScoreCallback(device=model.device, average=False)
             early_stopping = EarlyStopping(monitor="R2", mode="max", patience=model_config.patience, min_delta=0.0)
             
-            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
+            tqdm_progress_bar = TQDMProgressBar(refresh_rate=5)  
+            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping,tqdm_progress_bar]
             
             print(f"Running with early stopping: {model_config.early_stopping}")
             if model_config.early_stopping:
