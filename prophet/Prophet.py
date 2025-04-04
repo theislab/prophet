@@ -14,12 +14,12 @@ import functools
 from pathlib import Path
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
-from dataloader import (
+from prophet.dataloader import (
     dataloader_phenotypes,
     process_priors,
     remove_nonexistent_cat,
 )
-from model import load_models_config, TransformerPredictor
+from prophet.model import load_models_config, TransformerPredictor
 from pytorch_lightning.callbacks import TQDMProgressBar
 
 def inherit_docs_and_signature(from_method):
@@ -199,7 +199,6 @@ class Prophet:
         else:
             print("pytorch model, finetuning")
             # automatically take 10% of the data as validation set
-            print("df.index:",df.index)
             train_indices = np.array(df.index)[np.random.choice(len(df.index), int(len(df.index) * 0.9), replace=False)]
             val_indices = np.array(df.index)[~np.isin(df.index, train_indices)]
             split = dataloader_phenotypes(
@@ -227,11 +226,11 @@ class Prophet:
         
             lr_monitor = LearningRateMonitor(logging_interval='step')
             dirpath = './ckpts/'
-            model_checkpointer = ModelCheckpoint(dirpath=dirpath, save_top_k=1, every_n_epochs=1, monitor='R2', mode='max')
+            model_checkpointer = ModelCheckpoint(dirpath=dirpath, save_top_k=1, every_n_epochs=1, monitor='R2_train', mode='max')
             r2_callback = R2ScoreCallback(device=model.device, average=False)
-            early_stopping = EarlyStopping(monitor="R2", mode="max", patience=model_config.patience, min_delta=0.0)
+            early_stopping = EarlyStopping(monitor="R2_train", mode="max", patience=model_config.patience, min_delta=0.0)
             
-            tqdm_progress_bar = TQDMProgressBar(refresh_rate=5)  
+            tqdm_progress_bar = TQDMProgressBar(refresh_rate=1)  
             callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping,tqdm_progress_bar]
             
             print(f"Running with early stopping: {model_config.early_stopping}")
@@ -242,17 +241,19 @@ class Prophet:
                 min_epochs=1,
                 #max_steps=100,
                 max_steps=model_config.max_steps,
-                max_epochs=3,
+                max_epochs=10,
                 accelerator='gpu',
                 # devices=int(os.environ.get('SLURM_NTASKS_PER_NODE', 1)),
                 check_val_every_n_epoch=1,
                 callbacks=callbacks,
                 # logger=wandb_logger,
-                strategy="ddp_notebook", #choose a notebook-compatible strategy: `Trainer(strategy='ddp_notebook')`
+                strategy="auto", #choose a notebook-compatible strategy: `Trainer(strategy='ddp_notebook')`
                 #precision="16-mixed",
+                enable_progress_bar=True,
                 gradient_clip_val=1,
+                log_every_n_steps = 1,
                 deterministic=True)
-       
+         
             trainer.fit(model=model, train_dataloaders=split[0], val_dataloaders=split[1])
             
     def _generate_predict_df(self,
