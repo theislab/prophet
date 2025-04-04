@@ -18,7 +18,7 @@ from prophet.dataloader import (
     process_priors,
     remove_nonexistent_cat,
 )
-from prophet.model import load_models_config, TransformerPredictor
+from model import load_models_config, TransformerPredictor
 
 def inherit_docs_and_signature(from_method):
     def decorator(to_method):
@@ -75,7 +75,7 @@ class Prophet:
             self.torch_dataset = True
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             print('returning trained model!')
-            model = TransformerPredictor.load_from_checkpoint(checkpoint_path=self.model_pth, map_location=device)
+            model = TransformerPredictor.load_from_checkpoint(checkpoint_path=self.model_pth, map_location=torch.device('cpu')) #map_location must be cpu to load from checkpoint if you used ddp-notebook
             model.eval()
             # working backwards from config
             if model.hparams.simpler:
@@ -244,7 +244,7 @@ class Prophet:
                 check_val_every_n_epoch=1,
                 callbacks=callbacks,
                 # logger=wandb_logger,
-                strategy="ddp",
+                strategy="ddp_notebook", #choose a notebook-compatible strategy: `Trainer(strategy='ddp_notebook')`
                 #precision="16-mixed",
                 gradient_clip_val=1,
                 deterministic=True)
