@@ -173,7 +173,7 @@ class Prophet:
         df = df.reset_index(drop=True)
 
         ## generate training dataloader
-        df = self._remove_nonexistent_cat(data_label=df, verbose=False)
+        df = self._remove_nonexistent_cat(data_label=df, verbose=True)
         split = dataloader_phenotypes(
             gene_embedding=self.iv_embedding,
             cell_lines_embedding=self.cl_embedding,
