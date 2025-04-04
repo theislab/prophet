@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
+import logging
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, Callback
 import numpy as np
 import pandas as pd
 import warnings
@@ -197,6 +198,7 @@ class Prophet:
         else:
             print("pytorch model, finetuning")
             # automatically take 10% of the data as validation set
+            print("df.index:",df.index)
             train_indices = np.array(df.index)[np.random.choice(len(df.index), int(len(df.index) * 0.9), replace=False)]
             val_indices = np.array(df.index)[~np.isin(df.index, train_indices)]
             split = dataloader_phenotypes(
@@ -238,7 +240,7 @@ class Prophet:
                 min_epochs=1,
                 #max_steps=100,
                 max_steps=model_config.max_steps,
-                #max_epochs=9,
+                max_epochs=3,
                 accelerator='gpu',
                 # devices=int(os.environ.get('SLURM_NTASKS_PER_NODE', 1)),
                 check_val_every_n_epoch=1,
@@ -248,8 +250,8 @@ class Prophet:
                 #precision="16-mixed",
                 gradient_clip_val=1,
                 deterministic=True)
-
-            trainer.fit(model=model, train_dataloaders=split)
+       
+            trainer.fit(model=model, train_dataloaders=split[0], val_dataloaders=split[1])
             
     def _generate_predict_df(self,
                              run_index: int,

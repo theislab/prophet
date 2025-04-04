@@ -10,7 +10,7 @@ fine_tune: True
 genes_prior: ['./embeddings/global_iv_scaledv3.csv',
 './embeddings/CTRP_with_smiles_simscaled.csv',
 './embeddings/Hadian_plates_NEW_simscaled.csv']
-max_steps: 20000
+max_steps: 1000
 batch_size: 256
 
 Transformer:
