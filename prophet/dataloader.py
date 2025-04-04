@@ -7,7 +7,7 @@ import warnings
 import pandas as pd
 from functools import reduce
 import math
-from .dataset import PhenotypeDataset
+from dataset import PhenotypeDataset
 
 SEED = 42  # the true, baseline seed (that sets test splits)
 
@@ -252,3 +252,30 @@ def check_data(data_label):
     needed = set(["phenotype", "cell_line", "iv1"])
     if not needed.issubset(cols):
         raise KeyError(f"Cols is missing {cols-needed}")
+
+def universal_processing(data_label):
+    
+    if 'phenotype' not in data_label.columns:
+        data_label['phenotype'] = 'none'
+            
+    data_label['value'] = data_label['value'].astype('f4')
+    data_label = data_label.reset_index(drop=True)
+
+
+    data_label['iv1'] = [x.lower() for x in data_label.iv1.values]  # allow translatability across organisms and drugs
+    data_label['iv2'] = [x.lower() for x in data_label.iv2.values]
+    check_valid(data_label)
+    
+    data_label_flipped = data_label.rename(
+        columns={'iv1': 'iv2', 'iv2': 'iv1'})
+    data_label = pd.concat([data_label, data_label_flipped], axis=0, ignore_index=True)
+    
+    return data_label
+    
+def check_valid(df):
+    if 'iv1' not in df.columns:
+        raise ValueError("Dataset must have at least one perturbation in a columns named iv1, iv2, etc.")
+    if 'cell_line' not in df.columns:
+        raise ValueError("Dataset must have a cellular context in a column labeled `cell_line`.")
+    if 'negative' in df.iv1.values:
+        raise ValueError("Dataset still contains the negative label, please specify negative_gene or negative_drug.")    
