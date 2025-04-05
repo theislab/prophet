@@ -7,9 +7,9 @@ pert_len: 2
 ckpt_path: /lustre/groups/ml01/projects/super_rad_project/pretrained_prophet/everything/iv_0_iv_out_multitest_300cl_1219iv_512model_8layers_Falsesimpler_Truemask_0.0001lr_Falseexplicitphenotype_10000warmup_150001max_iters_Falseunbalanced_0.01wd_4096bs_Falseft/iv_0_seed_2024/epoch=29.ckpt
 fine_tune: True
 
-genes_prior: [ './embeddings/global_iv_scaledv3.csv',
-'./embeddings/CTRP_with_smiles_simscaled.csv',
-'./embeddings/Hadian_plates_NEW_simscaled.csv']
+genes_prior: [ '/lustre/groups/ml01/projects/super_rad_project/intervention_embeddings/global_iv_scaledv3.csv',
+'/lustre/groups/ml01/projects/super_rad_project/intervention_embeddings/CTRP_with_smiles_simscaled.csv',
+'/lustre/groups/ml01/projects/super_rad_project/intervention_embeddings/Hadian_plates_NEW_simscaled.csv']
 max_steps: 1000
 batch_size: 256
 
