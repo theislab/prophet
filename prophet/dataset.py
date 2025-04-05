@@ -42,6 +42,7 @@ class PhenotypeDataset(Dataset):
         self.experimental_data = experimental_data[columns].values  # ordered
         self.labels = experimental_data[label_key].values
         self.iv = iv_embeddings.iloc[:, 1:].values        
+        self.iv_embs_types = iv_embeddings.iloc[:, 0].values 
         self.cell_line = cell_line_embeddings.values
         self.iv_to_index = dict(zip(iv_embeddings.index, range(iv_embeddings.shape[0])))
         self.cl_to_index = dict(zip(cell_line_embeddings.index, range(cell_line_embeddings.shape[0])))
