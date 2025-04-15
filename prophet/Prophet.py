@@ -56,7 +56,7 @@ class Prophet:
         self.cl_emb_path = cl_emb_path
         self.ph_emb_path = ph_emb_path
         # set phenotypes (must be in the same order regardless of what is passed in predict)
-        self.phenotypes = list(pd.read_csv('./embeddings/phenotypes.csv', index_col=0).values.flatten())
+        self.phenotypes = None
         self.column_map = None
         self.pert_len = None
 
@@ -65,6 +65,7 @@ class Prophet:
         else:
             self.model_pth = model_pth
             self.model = self._build_model(architecture)
+            self.phenotypes = self.model.hparams["phenotypes"]
             self.iv_embedding, self.cl_embedding, self.ph_embedding = process_priors(self.iv_emb_path, self.cl_emb_path, self.ph_emb_path)
             if self.model.hparams.explicit_phenotype and self.ph_embedding is None:
                 raise ValueError('model was run with explicit phenotype! must pass a ph_emb_path')
@@ -241,7 +242,7 @@ class Prophet:
                 min_epochs=1,
                 #max_steps=100,
                 max_steps=model_config.max_steps,
-                max_epochs=10,
+                max_epochs=2,
                 accelerator='gpu',
                 # devices=int(os.environ.get('SLURM_NTASKS_PER_NODE', 1)),
                 check_val_every_n_epoch=1,
@@ -253,7 +254,7 @@ class Prophet:
                 gradient_clip_val=1,
                 log_every_n_steps = 1,
                 deterministic=True)
-         
+
             trainer.fit(model=model, train_dataloaders=split[0], val_dataloaders=split[1])
             
     def _generate_predict_df(self,
@@ -422,9 +423,9 @@ class Prophet:
                 # must have a value column
                 data_label['_'] = 0
                 # manually add one row per phenotype, ensuring model has all the phenotypes for indexing to be correct
-                duplicated_rows = data_label.tail(len(self.phenotypes)).copy()
-                duplicated_rows['phenotype'] = self.phenotypes
-                data_label = pd.concat([data_label, duplicated_rows], ignore_index=True)
+                # duplicated_rows = data_label.tail(len(self.phenotypes)).copy()
+                # duplicated_rows['phenotype'] = self.phenotypes
+                # data_label = pd.concat([data_label, duplicated_rows], ignore_index=True)
 
             split = dataloader_phenotypes(
                     gene_embedding=self.iv_embedding,
