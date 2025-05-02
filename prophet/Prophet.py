@@ -14,12 +14,12 @@ import functools
 from pathlib import Path
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
-from prophet.dataloader import (
+from .dataloader import (
     dataloader_phenotypes,
     process_priors,
     remove_nonexistent_cat,
 )
-from prophet.model import load_models_config, TransformerPredictor
+from .model import load_models_config, TransformerPredictor
 from pytorch_lightning.callbacks import TQDMProgressBar
 
 def inherit_docs_and_signature(from_method):

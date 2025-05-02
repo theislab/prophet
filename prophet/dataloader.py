@@ -7,7 +7,7 @@ import warnings
 import pandas as pd
 from functools import reduce
 import math
-from dataset import PhenotypeDataset
+from .dataset import PhenotypeDataset
 
 SEED = 42  # the true, baseline seed (that sets test splits)
 
