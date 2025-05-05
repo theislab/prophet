@@ -2,7 +2,6 @@ import pytest
 import pandas as pd
 import numpy as np
 from torch.utils.data import DataLoader
-import sys
 
 from prophet.dataloader import (
     dataloader_phenotypes,

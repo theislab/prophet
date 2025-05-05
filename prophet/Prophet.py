@@ -1,17 +1,13 @@
 import torch
-import torch.nn as nn
 import pytorch_lightning as pl
-import logging
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, Callback
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 import numpy as np
 import pandas as pd
 import warnings
 from tqdm import tqdm
-from typing import List, Union, Dict, Optional
-from itertools import permutations
+from typing import List, Union, Optional
 from prophet.callbacks import R2ScoreCallback
 import functools
-from pathlib import Path
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
 from .dataloader import (
@@ -219,8 +215,7 @@ class Prophet:
                 valid_set=True
             )
 
-            model_config.ohe_dim = 0  # relic of ohe
-            # phenotypes = data[-1] # ordered list of phenotypes
+            model_config.ohe_dim = 0
 
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             model, model_config = load_models_config(model_config, seed=42, phenotypes=None) 
@@ -244,10 +239,8 @@ class Prophet:
                 max_steps=model_config.max_steps,
                 max_epochs=2,
                 accelerator='gpu',
-                # devices=int(os.environ.get('SLURM_NTASKS_PER_NODE', 1)),
                 check_val_every_n_epoch=1,
                 callbacks=callbacks,
-                # logger=wandb_logger,
                 strategy="auto", #choose a notebook-compatible strategy: `Trainer(strategy='ddp_notebook')`
                 #precision="16-mixed",
                 enable_progress_bar=True,
@@ -363,7 +356,7 @@ class Prophet:
                 iv_col = ['iv1']
 
             total_size = len(target_ivs) * len(target_cls) * len(target_phs)
-            self._init_input(iv_col, 'cell_line', 'phenotype', 'value')  # since we're constructing it ourselves
+            self._init_input(iv_col, 'cell_line', 'phenotype', 'value')
         # or pass a dataframe has similiar format with in train
         else:
             self._init_input(iv_col, cl_col, ph_col, 'value')
@@ -422,10 +415,6 @@ class Prophet:
             if self.torch_dataset:  # format for pytorch dataloading
                 # must have a value column
                 data_label['_'] = 0
-                # manually add one row per phenotype, ensuring model has all the phenotypes for indexing to be correct
-                # duplicated_rows = data_label.tail(len(self.phenotypes)).copy()
-                # duplicated_rows['phenotype'] = self.phenotypes
-                # data_label = pd.concat([data_label, duplicated_rows], ignore_index=True)
 
             split = dataloader_phenotypes(
                     gene_embedding=self.iv_embedding,

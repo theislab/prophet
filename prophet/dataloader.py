@@ -1,12 +1,9 @@
-from sklearn.model_selection import LeaveOneGroupOut, KFold
 from torch.utils.data import DataLoader
-from typing import Literal, List, Tuple, Optional
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from typing import List, Tuple
+from torch.utils.data import WeightedRandomSampler
 import numpy as np
-import warnings
 import pandas as pd
 from functools import reduce
-import math
 from .dataset import PhenotypeDataset
 
 SEED = 42  # the true, baseline seed (that sets test splits)
@@ -64,7 +61,6 @@ def dataloader_phenotypes(
         raise ValueError("No column 'type' in gene_embedding")
 
     if not torch_dataset:
-        # Note: this doesn't evaluate on multiple test sets because probably it will never be used at scale
         # create input dataframes
         ge = gene_embedding.dropna()
         ce = cell_lines_embedding.dropna()
@@ -150,9 +146,9 @@ def dataloader_phenotypes(
     else:
         test_dataloader = None
 
-    if unbalanced: # unbalanced means that one phenotype is way more measured that the other (not sure whether this should be implemented tbh)
+    if unbalanced: # unbalanced means that one phenotype is way more measured that the other
 
-        # # Count the occurrences of each class
+        ## Count the occurrences of each class
         key = 'phenotype'
         if 'dataset' in data.columns:
             key = 'dataset'
@@ -208,9 +204,6 @@ def process_priors(genes_prior, cell_lines_prior, phenotype_prior):
     gene_prior.loc['negative_drug'] = 0
     gene_prior.loc['negative_gene', 'type'] = 'gene'
     gene_prior.loc['negative_drug', 'type'] = 'drug'
-
-    # I wanted to remove duplicate smiles for efficient runtime but idk what this actually does
-    # gene_prior = gene_prior[~gene_prior.index.duplicated(keep='first')]
 
     return gene_prior, cl_prior, phe_prior
 

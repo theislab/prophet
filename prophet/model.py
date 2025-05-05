@@ -6,11 +6,9 @@ import torch.nn.init as init
 from prophet.callbacks import CosineWarmupScheduler
 import logging
 
-from tqdm import tqdm
 
 class TransformerPredictor(pl.LightningModule):
 
-    #def __init__(self, config):
     def __init__(self, 
                  dim_cl: int,
                  dim_iv: int,
@@ -157,9 +155,9 @@ class TransformerPredictor(pl.LightningModule):
             nn.Linear(dim_regressor_input, 1)
             )
         
-        print(f'Gene net: ', self.gene_net, flush=True)
-        print(f'Cell line net: ', self.cl_net, flush=True)
-        print(f'Regressor: ', self.output_net, flush=True)
+        print('Gene net: ', self.gene_net, flush=True)
+        print('Cell line net: ', self.cl_net, flush=True)
+        print('Regressor: ', self.output_net, flush=True)
         if self.hparams.explicit_phenotype:
             print("Using explicit phenotype")
         if self.hparams.linear_predictor:
@@ -181,8 +179,7 @@ class TransformerPredictor(pl.LightningModule):
         
         phenotype_emb = self.embedding_dropout(phenotype_emb) # dropout
         # shape is (batch_size x n_dim)
-            
-                
+    
         # Drugs to drug network and genes to gene network
         # We mask the attention to the negative perturbations, so it's like not using the networks
         drug_perturbations = [self.drug_net(tensor).unsqueeze(1) for tensor in perturbations] # all perts to drug
@@ -227,8 +224,7 @@ class TransformerPredictor(pl.LightningModule):
                 x = torch.max(x, dim=1) # max-pool
             
         # If sum, forget about everything else
-        if self.hparams.sum:            
-            #x = torch.sum(embeddings, dim=1)
+        if self.hparams.sum:
             x = torch.reshape(embeddings, (embeddings.shape[0], -1))
 
         if self.hparams.simpler:
@@ -351,7 +347,6 @@ class TransformerPredictor(pl.LightningModule):
         else:
             phenotype, cl = phenotype.to(torch.int32), cl.to(torch.float32)
 
-        #y_hat = self.forward(phenotype, cl, perturbations, perturbations_type, attn_mask)
         y_hat = self(phenotype, cl, perturbations, perturbations_type, attn_mask)
 
         y = y.unsqueeze(1)
@@ -380,7 +375,6 @@ class TransformerPredictor(pl.LightningModule):
         else:
             phenotype, cl = phenotype.to(torch.int32), cl.to(torch.float32)
 
-        # y_hat = self.forward(phenotype, cl, perturbations, perturbations_type, attn_mask)
         y_hat = self(phenotype, cl, perturbations, perturbations_type, attn_mask)
         
         y = y.unsqueeze(1)
@@ -409,7 +403,6 @@ class TransformerPredictor(pl.LightningModule):
         else:
             phenotype, cl = phenotype.to(torch.int32), cl.to(torch.float32)
 
-        # y_hat = self.forward(phenotype, cl, perturbations, perturbations_type, attn_mask)
         y_hat = self(phenotype, cl, perturbations, perturbations_type, attn_mask)
         
         y = y.unsqueeze(1)
@@ -465,7 +458,6 @@ class TransformerPredictor(pl.LightningModule):
         else:
             phenotype, cl = phenotype.to(torch.int32), cl.to(torch.float32)
 
-        # y_hat = self.forward(phenotype, cl, perturbations, perturbations_type, attn_mask)
         y_hat = self(phenotype, cl, perturbations, perturbations_type, attn_mask)
         
         return y_hat, y

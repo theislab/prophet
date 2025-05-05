@@ -5,7 +5,7 @@ from typing import List, Dict
 class TransformerConfig:
     dim_cl: int = 300
     dim_iv: int = 800
-    dim_phe: int = 300 # since now is concatenation
+    dim_phe: int = 300
     model_dim: int = 128
     num_heads: int = 1
     num_layers: int = 2
@@ -67,7 +67,7 @@ def set_config(models_config):
     config.update_from_dict(models_config)
 
     if config.transformer.simpler:
-       config.ctx_len = config.pert_len + 1 # add CLS
+       config.ctx_len = config.pert_len + 1
     else:
-        config.ctx_len = config.pert_len + 3 # add CLS, phenotype and cell line
+        config.ctx_len = config.pert_len + 3
     return config

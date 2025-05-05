@@ -74,13 +74,13 @@ def train_transformer(data, model, config, name, seed):
         split_num = descriptor.split('_')[1]
         ckpt_path = f"{config.ckpt_path}/{axis_name}_{split_num}_seed_{seed}/"
         if config.fine_tune:
-            ckpt_path = f"{config.ckpt_path.replace(f'iv_0_iv', f'{axis}_{split_num}_{axis}')}/{axis_name}_{split_num}_seed_{seed}/"
+            ckpt_path = f"{config.ckpt_path.replace('iv_0_iv', f'{axis}_{split_num}_{axis}')}/{axis_name}_{split_num}_seed_{seed}/"
         files = os.listdir(ckpt_path) # ckpt_path is the path to a folder
         full_paths = [os.path.join(ckpt_path, file) for file in files]
         ckpt_file = max(full_paths, key=os.path.getmtime) # ckpt_file is the .ckpt file
         print(f"Resume training from {ckpt_file}")
         if config.fine_tune:
-            print(f"Fine tuning")
+            print("Fine tuning")
             model = TransformerPredictor.load_from_checkpoint(ckpt_file, warmup=config.transformer.warmup)
             trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=valid_dataloader) # train from scratch
         else:

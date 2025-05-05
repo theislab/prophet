@@ -1,5 +1,4 @@
 import torch
-import pandas as pd
 import argparse
 import pprint
 
@@ -14,7 +13,7 @@ import yaml
 # Add arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--setting", type=str,
-                    default="Rad", required=False) # Rad, Rad_Horlbeck or Horlbeck
+                    default="Rad", required=False)
 parser.add_argument("--leaveout_method", type=str,
                     default="leave_one_cl_out", required=False)
 parser.add_argument("--config_file", type=str, required=True) # config file with info regarding the architecture
@@ -78,7 +77,7 @@ if __name__ == "__main__":
             pert_len = models_config.pert_len,
         )
 
-        models_config.ohe_dim = 0  # relic of ohe
+        models_config.ohe_dim = 0
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model, models_config = load_models_config(models_config, seed)

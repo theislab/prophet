@@ -86,7 +86,7 @@ class PhenotypeDataset(Dataset):
         for i in range(2, self.pert_len + 2):
             name = item[i]  # perturbation name
             emb_entry = self.iv[self.iv_to_index[name]]
-            iv_type.append(emb_entry[0]) # first item of the embedding is 'gene' or 'drug' - this could probably have been precomputed
+            iv_type.append(emb_entry[0]) # first item of the embedding is 'gene' or 'drug'
             iv_values_dict[f'iv{i-1}'] = emb_entry.astype('float64') # use all dimensions but the first one
                 
         # if there isn't phenotype embedding 
@@ -103,7 +103,6 @@ class PhenotypeDataset(Dataset):
         return {'phenotype': context, # sometimes an int, sometimes an embedidng
                 'cell_line': self.cell_line[self.cl_to_index[cell_line]],
                 'label': self.labels[idx],
-                # 'names': names,
                 'attn_mask': self.attn_mask[idx],
                 'idx': idx,
                 'pert_type': iv_types, 
