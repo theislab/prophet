@@ -226,7 +226,7 @@ class Prophet:
             model, model_config = load_models_config(model_config, seed=42, phenotypes=None) 
         
             lr_monitor = LearningRateMonitor(logging_interval='step')
-            dirpath = './ckpts/'
+            dirpath = model_config.dirpath
             model_checkpointer = ModelCheckpoint(dirpath=dirpath, save_top_k=1, every_n_epochs=1, monitor='R2_train', mode='max')
             r2_callback = R2ScoreCallback(device=model.device, average=False)
             early_stopping = EarlyStopping(monitor="R2_train", mode="max", patience=model_config.patience, min_delta=0.0)
