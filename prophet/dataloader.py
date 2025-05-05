@@ -27,7 +27,7 @@ def dataloader_phenotypes(
     unbalanced: bool = False,
     torch_dataset: bool = True,
     pert_len: int = 2,
-    valid_set: bool = True, # no idea Yuge, check this
+    valid_set: bool = True,
     test_set: bool = True,
     phenotypes: list = None,
 ) -> List[Tuple[DataLoader, DataLoader, DataLoader, np.array, np.array]] :
@@ -66,9 +66,7 @@ def dataloader_phenotypes(
     if not torch_dataset:
         # Note: this doesn't evaluate on multiple test sets because probably it will never be used at scale
         # create input dataframes
-        # ge = pd.concat(gene_embeddings, axis=1).dropna()
         ge = gene_embedding.dropna()
-        # ce = pd.concat(cell_lines_embeddings, axis=1).dropna()
         ce = cell_lines_embedding.dropna()
         ge = ge.drop(columns=['type'])
 
@@ -97,9 +95,6 @@ def dataloader_phenotypes(
     data = data_label.copy()
     if phenotypes is None:
         phenotypes = sorted(list(data_label.phenotype.unique()))
-        
-        # for i in range(len(phenotypes)):
-        #     print(f"Phenotype {i} is {phenotypes[i]}")
 
     train_set = PhenotypeDataset(
         experimental_data = data.loc[train_indices], 
@@ -257,3 +252,30 @@ def check_data(data_label):
     needed = set(["phenotype", "cell_line", "iv1"])
     if not needed.issubset(cols):
         raise KeyError(f"Cols is missing {cols-needed}")
+
+def universal_processing(data_label):
+    
+    if 'phenotype' not in data_label.columns:
+        data_label['phenotype'] = 'none'
+            
+    data_label['value'] = data_label['value'].astype('f4')
+    data_label = data_label.reset_index(drop=True)
+
+
+    data_label['iv1'] = [x.lower() for x in data_label.iv1.values]  # allow translatability across organisms and drugs
+    data_label['iv2'] = [x.lower() for x in data_label.iv2.values]
+    check_valid(data_label)
+    
+    data_label_flipped = data_label.rename(
+        columns={'iv1': 'iv2', 'iv2': 'iv1'})
+    data_label = pd.concat([data_label, data_label_flipped], axis=0, ignore_index=True)
+    
+    return data_label
+    
+def check_valid(df):
+    if 'iv1' not in df.columns:
+        raise ValueError("Dataset must have at least one perturbation in a columns named iv1, iv2, etc.")
+    if 'cell_line' not in df.columns:
+        raise ValueError("Dataset must have a cellular context in a column labeled `cell_line`.")
+    if 'negative' in df.iv1.values:
+        raise ValueError("Dataset still contains the negative label, please specify negative_gene or negative_drug.")    

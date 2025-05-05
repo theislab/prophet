@@ -36,7 +36,7 @@ class TransformerConfig:
 class Config:
     setting: str
     leaveout_method: str
-    dirpath: str
+    dirpath: str = './ckpts/'
     ckpt_path: str = None
     project_name: str = "Prophet_hparams"
     cell_lines_prior: List[str] = field(default_factory=lambda: ["./embeddings/cell_line_embedding_full_ccle_300_scaled.csv"])
@@ -63,7 +63,6 @@ def set_config(models_config):
     config = Config(
         setting=models_config['setting'],
         leaveout_method=models_config['leaveout_method'],
-        dirpath=models_config['dirpath'],
     )
     config.update_from_dict(models_config)
 

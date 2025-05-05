@@ -41,7 +41,8 @@ class PhenotypeDataset(Dataset):
         columns = ['cell_line', 'phenotype'] + [f'iv{i}' for i in range(1, pert_len + 1)]
         self.experimental_data = experimental_data[columns].values  # ordered
         self.labels = experimental_data[label_key].values
-        self.iv = iv_embeddings.values
+        self.iv = iv_embeddings.iloc[:, 1:].values        
+        self.iv_embs_types = iv_embeddings.iloc[:, 0].values 
         self.cell_line = cell_line_embeddings.values
         self.iv_to_index = dict(zip(iv_embeddings.index, range(iv_embeddings.shape[0])))
         self.cl_to_index = dict(zip(cell_line_embeddings.index, range(cell_line_embeddings.shape[0])))
@@ -86,7 +87,7 @@ class PhenotypeDataset(Dataset):
             name = item[i]  # perturbation name
             emb_entry = self.iv[self.iv_to_index[name]]
             iv_type.append(emb_entry[0]) # first item of the embedding is 'gene' or 'drug' - this could probably have been precomputed
-            iv_values_dict[f'iv{i-1}'] = emb_entry[1:].astype('float64') # use all dimensions but the first one
+            iv_values_dict[f'iv{i-1}'] = emb_entry.astype('float64') # use all dimensions but the first one
                 
         # if there isn't phenotype embedding 
         if self.phenotype_embeddings is None:

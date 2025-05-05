@@ -23,5 +23,6 @@ setup(
         'tqdm==4.66.4',
         'wandb==0.17.6',
         'jupyterlab==4.1.5',
+        'pytest==8.3.5'
     ],
 )

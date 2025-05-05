@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 from torch import optim
 import torch.nn.init as init
 from prophet.callbacks import CosineWarmupScheduler
+import logging
 
 from tqdm import tqdm
 
@@ -35,7 +36,8 @@ class TransformerPredictor(pl.LightningModule):
                  explicit_phenotype: bool = False,
                  linear_predictor: bool = False,
                  tokenizer_layers: int = 2,
-                 seed=42):
+                 seed=42,
+                phenotypes=None):
         """
         Inputs:
             dim_cl - Number of dimensions to take from the cell lines
@@ -61,6 +63,11 @@ class TransformerPredictor(pl.LightningModule):
         """
         super().__init__()
 
+        ## Process phenotypes to save them in the checkpoint
+        if phenotypes is not None:
+            self.ph_to_index = dict(zip(phenotypes, range(len(phenotypes))))
+            logging.info(f"Phenotypes: {self.ph_to_index}")
+            
         self.save_hyperparameters()
         self._create_model()
         
@@ -482,7 +489,7 @@ class TransformerPredictor(pl.LightningModule):
                 init.zeros_(m.bias)
 
 
-def load_models_config(models_config, seed, hparams=False, trial=None):
+def load_models_config(models_config, seed, hparams=False, trial=None, phenotypes=None):
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if hparams:
@@ -498,6 +505,6 @@ def load_models_config(models_config, seed, hparams=False, trial=None):
                                        pool=models_config.transformer.pool, simpler=models_config.transformer.simpler,
                                        ctx_len=models_config.ctx_len, mask=models_config.transformer.mask, sum=models_config.transformer.sum, 
                                        explicit_phenotype=models_config.transformer.explicit_phenotype, linear_predictor=models_config.transformer.linear_predictor, tokenizer_layers=models_config.transformer.tokenizer_layers,
-                                       seed=seed)
+                                       seed=seed,phenotypes=None)
 
     return transformer, models_config

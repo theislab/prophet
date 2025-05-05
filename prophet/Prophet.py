@@ -1,12 +1,15 @@
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
+import logging
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor, Callback
 import numpy as np
 import pandas as pd
 import warnings
 from tqdm import tqdm
 from typing import List, Union, Dict, Optional
 from itertools import permutations
+from prophet.callbacks import R2ScoreCallback
 import functools
 from pathlib import Path
 from joblib import load
@@ -17,6 +20,7 @@ from .dataloader import (
     remove_nonexistent_cat,
 )
 from .model import load_models_config, TransformerPredictor
+from pytorch_lightning.callbacks import TQDMProgressBar
 
 def inherit_docs_and_signature(from_method):
     def decorator(to_method):
@@ -52,7 +56,7 @@ class Prophet:
         self.cl_emb_path = cl_emb_path
         self.ph_emb_path = ph_emb_path
         # set phenotypes (must be in the same order regardless of what is passed in predict)
-        self.phenotypes = list(pd.read_csv('./embeddings/phenotypes.csv', index_col=0).values.flatten())
+        self.phenotypes = None
         self.column_map = None
         self.pert_len = None
 
@@ -61,6 +65,7 @@ class Prophet:
         else:
             self.model_pth = model_pth
             self.model = self._build_model(architecture)
+            self.phenotypes = self.model.hparams["phenotypes"]
             self.iv_embedding, self.cl_embedding, self.ph_embedding = process_priors(self.iv_emb_path, self.cl_emb_path, self.ph_emb_path)
             if self.model.hparams.explicit_phenotype and self.ph_embedding is None:
                 raise ValueError('model was run with explicit phenotype! must pass a ph_emb_path')
@@ -73,7 +78,7 @@ class Prophet:
             self.torch_dataset = True
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             print('returning trained model!')
-            model = TransformerPredictor.load_from_checkpoint(checkpoint_path=self.model_pth, map_location=device)
+            model = TransformerPredictor.load_from_checkpoint(checkpoint_path=self.model_pth, map_location=torch.device('cpu')) #map_location must be cpu to load from checkpoint if you used ddp-notebook
             model.eval()
             # working backwards from config
             if model.hparams.simpler:
@@ -143,13 +148,12 @@ class Prophet:
         cl_col: str = "cell_line",
         ph_col: str = "phenotype",
         readout_col: str = "value",
+        model_config: dict = None,
     ):
         """Train the Prophet model on the provided DataFrame.
 
         This function reformats the DataFrame according to the specified settings and intervention columns,
         then trains the model using the reformatted data.
-
-        Warning: this has not yet been compared to train_model.py, use at your own risk.
 
         Args:
             df (pd.DataFrame): The DataFrame containing the experimental data.
@@ -157,7 +161,7 @@ class Prophet:
             cl_col (str, optional): The name of the column in df that contains the setting labels. Defaults to "cell_line".
             ph_col (str, optional): The name of the column in df that contains the phenotype labels. Defaults to "phenotype".
             readout_col (str, optional): The name of the column in df that contains the readout data. Defaults to "value".
-            flip_iv_col (bool, optional): Whether to flip the intervention columns for data augmentation. Defaults to False. If using the Transformer architecture, should be turned off to save memory.
+            model_config (dict, optional): Configuration yaml, e.g. config_file_finetuning
         """
         self._init_input(iv_col, cl_col, ph_col, readout_col)
         # user-friendly check that the columns were passed in correctly
@@ -172,7 +176,7 @@ class Prophet:
         df = df.reset_index(drop=True)
 
         ## generate training dataloader
-        df = self._remove_nonexistent_cat(data_label=df, verbose=False)
+        df = self._remove_nonexistent_cat(data_label=df, verbose=True)
         split = dataloader_phenotypes(
             gene_embedding=self.iv_embedding,
             cell_lines_embedding=self.cl_embedding,
@@ -194,9 +198,65 @@ class Prophet:
             X_train, y_train = split[2]
             self.model.fit(X_train, y_train)
         else:
-            print('pytorch model, already fit')  # train does not currently support finetuning
-            pass
+            print("pytorch model, finetuning")
+            # automatically take 10% of the data as validation set
+            train_indices = np.array(df.index)[np.random.choice(len(df.index), int(len(df.index) * 0.9), replace=False)]
+            val_indices = np.array(df.index)[~np.isin(df.index, train_indices)]
+            split = dataloader_phenotypes(
+                gene_embedding=self.iv_embedding,
+                cell_lines_embedding=self.cl_embedding,
+                phenotype_embedding=self.ph_embedding if self.ph_embedding is not None else None,
+                data_label=df,
+                label_name="value",
+                index=(
+                    train_indices,
+                    val_indices,
+                    [],
+                    "",
+                ),  # (train, val, test, descr)
+                torch_dataset=self.torch_dataset,
+                pert_len=len(self.iv_cols),
+                valid_set=True
+            )
 
+            model_config.ohe_dim = 0  # relic of ohe
+            # phenotypes = data[-1] # ordered list of phenotypes
+
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            model, model_config = load_models_config(model_config, seed=42, phenotypes=None) 
+        
+            lr_monitor = LearningRateMonitor(logging_interval='step')
+            dirpath = model_config.dirpath
+            model_checkpointer = ModelCheckpoint(dirpath=dirpath, save_top_k=1, every_n_epochs=1, monitor='R2_train', mode='max')
+            r2_callback = R2ScoreCallback(device=model.device, average=False)
+            early_stopping = EarlyStopping(monitor="R2_train", mode="max", patience=model_config.patience, min_delta=0.0)
+            
+            tqdm_progress_bar = TQDMProgressBar(refresh_rate=1)  
+            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping,tqdm_progress_bar]
+            
+            print(f"Running with early stopping: {model_config.early_stopping}")
+            if model_config.early_stopping:
+                print(f"Early stopping patience: {model_config.patience}")
+            
+            trainer = pl.Trainer(
+                min_epochs=1,
+                #max_steps=100,
+                max_steps=model_config.max_steps,
+                max_epochs=2,
+                accelerator='gpu',
+                # devices=int(os.environ.get('SLURM_NTASKS_PER_NODE', 1)),
+                check_val_every_n_epoch=1,
+                callbacks=callbacks,
+                # logger=wandb_logger,
+                strategy="auto", #choose a notebook-compatible strategy: `Trainer(strategy='ddp_notebook')`
+                #precision="16-mixed",
+                enable_progress_bar=True,
+                gradient_clip_val=1,
+                log_every_n_steps = 1,
+                deterministic=True)
+
+            trainer.fit(model=model, train_dataloaders=split[0], val_dataloaders=split[1])
+            
     def _generate_predict_df(self,
                              run_index: int,
                              num_iterations: int,
@@ -363,9 +423,9 @@ class Prophet:
                 # must have a value column
                 data_label['_'] = 0
                 # manually add one row per phenotype, ensuring model has all the phenotypes for indexing to be correct
-                duplicated_rows = data_label.tail(len(self.phenotypes)).copy()
-                duplicated_rows['phenotype'] = self.phenotypes
-                data_label = pd.concat([data_label, duplicated_rows], ignore_index=True)
+                # duplicated_rows = data_label.tail(len(self.phenotypes)).copy()
+                # duplicated_rows['phenotype'] = self.phenotypes
+                # data_label = pd.concat([data_label, duplicated_rows], ignore_index=True)
 
             split = dataloader_phenotypes(
                     gene_embedding=self.iv_embedding,
