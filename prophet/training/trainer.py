@@ -1,5 +1,5 @@
-from model import TransformerPredictor
-from prophet.callbacks import R2ScoreCallback
+from ..models import TransformerPredictor
+from .callbacks import R2ScoreCallback
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger

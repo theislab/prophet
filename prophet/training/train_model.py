@@ -2,11 +2,11 @@ import torch
 import argparse
 import pprint
 
-from dataloader import dataloader_phenotypes, get_split_indices, get_data_by_setting
-from train import train_transformer
-from model import load_models_config
+from ..data import dataloader_phenotypes, get_split_indices, get_data_by_setting
+from .trainer import train_transformer
+from ..models import load_models_config
 import pytorch_lightning as pl
-from prophet.config import set_config
+from ..core.config import set_config
 import os
 import yaml
 

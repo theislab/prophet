@@ -1,0 +1,29 @@
+# Include essential files
+include README.md
+include LICENSE
+include INSTALLATION.md
+include requirements.txt
+
+# Include the main prophet package
+recursive-include prophet *.py
+
+# Include configuration files
+recursive-include tutorials *.yaml
+recursive-include tutorials *.yml
+
+# Include data files (embeddings)
+recursive-include embeddings *.csv
+
+# Include tutorial notebooks
+recursive-include tutorials *.ipynb
+
+# Include tests
+recursive-include test *.py
+
+# Exclude cache and build files
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude .git*
+global-exclude .pytest_cache

@@ -88,11 +88,12 @@ class PhenotypeDataset(Dataset):
             emb_entry = self.iv[self.iv_to_index[name]]
             iv_type.append(emb_entry[0]) # first item of the embedding is 'gene' or 'drug'
             iv_values_dict[f'iv{i-1}'] = emb_entry.astype('float64') # use all dimensions but the first one
-                
+
         # if there isn't phenotype embedding 
         if self.phenotype_embeddings is None:
             context = self.ph_to_index[phenotype] # retrieve index
             context = context + 1 # CLS is 0 
+            context = 54 # hardcode for now
         else: # if there's embedding
             context = self.phenotype_embeddings[self.ph_to_index[phenotype]] # retrieve embedding
 
@@ -102,7 +103,7 @@ class PhenotypeDataset(Dataset):
 
         return {'phenotype': context, # sometimes an int, sometimes an embedidng
                 'cell_line': self.cell_line[self.cl_to_index[cell_line]],
-                'label': self.labels[idx],
+                'label': self.labels[idx].astype(np.float32),
                 'attn_mask': self.attn_mask[idx],
                 'idx': idx,
                 'pert_type': iv_types, 

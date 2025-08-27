@@ -3,9 +3,10 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from torch import optim
 import torch.nn.init as init
-from prophet.callbacks import CosineWarmupScheduler
+from ..training.callbacks import CosineWarmupScheduler
 import logging
 
+from tqdm import tqdm
 
 class TransformerPredictor(pl.LightningModule):
 
@@ -154,14 +155,6 @@ class TransformerPredictor(pl.LightningModule):
             self.output_net = nn.Sequential(
             nn.Linear(dim_regressor_input, 1)
             )
-        
-        print('Gene net: ', self.gene_net, flush=True)
-        print('Cell line net: ', self.cl_net, flush=True)
-        print('Regressor: ', self.output_net, flush=True)
-        if self.hparams.explicit_phenotype:
-            print("Using explicit phenotype")
-        if self.hparams.linear_predictor:
-            print("Using linear predictor")
 
     def forward(self, phenotype, cl, perturbations, perturbations_type, attn_mask):
         """
@@ -171,12 +164,12 @@ class TransformerPredictor(pl.LightningModule):
         cl = cl[:,:self.hparams.dim_cl]
         perturbations = [pert[:, :self.hparams.dim_iv] for pert in perturbations]
         attn_mask = attn_mask[:, :self.hparams.ctx_len] 
-        
+
         if self.hparams.explicit_phenotype:
             phenotype_emb = self.phenotype_net(phenotype[:,:self.hparams.dim_phe])
         else:
             phenotype_emb = self.learnable_embedding(phenotype) # Phenotype 
-        
+
         phenotype_emb = self.embedding_dropout(phenotype_emb) # dropout
         # shape is (batch_size x n_dim)
     
@@ -193,11 +186,11 @@ class TransformerPredictor(pl.LightningModule):
         cl_embedding = self.cl_net(cl).unsqueeze(1) # unsqueeze just useful if not simpler
         phenotype_emb = phenotype_emb.unsqueeze(1)
         # bs x n x dim
-                
+
         # Regression token (CLS) stored in index 0 
         cls = torch.zeros(size=(phenotype_emb.shape[0], 1), device=phenotype_emb.device, dtype=torch.int32)
         cls = self.learnable_embedding(cls) # we get the embedding, shape (bs x 1 x dim)
-        
+
         if self.hparams.pool == 'cls':
             if self.hparams.simpler: # if simpler, just perturbations and CLS to transformer
                 embeddings = torch.cat((cls, perturbations), dim=1)
@@ -208,31 +201,25 @@ class TransformerPredictor(pl.LightningModule):
                 embeddings = perturbations
             else:
                 embeddings = torch.cat((perturbations, cl_embedding, phenotype_emb), dim=1)
-                            
         # Run Transformer Layer
         if not self.hparams.sum:
             if self.hparams.mask:
                 x = self.transformer(embeddings, mask=None, src_key_padding_mask=attn_mask)
             else:
                 x = self.transformer(embeddings, mask=None)
-            
             if self.hparams.pool == 'cls':
                 x = x[:, 0, :] # use just the regressor token for regression
             elif self.hparams.pool == 'mean':
                 x = torch.mean(x, dim=1) # mean-pool
             else:
                 x = torch.max(x, dim=1) # max-pool
-            
         # If sum, forget about everything else
         if self.hparams.sum:
             x = torch.reshape(embeddings, (embeddings.shape[0], -1))
-
         if self.hparams.simpler:
             x = torch.cat((x, cl_embedding.squeeze(1), phenotype_emb.squeeze(1)), dim=-1) 
             
-            
         x = self.output_net(x)
-        
         return x
     
     def embedding(self, phenotype, cl, perturbations, perturbations_type, attn_mask):
@@ -357,15 +344,15 @@ class TransformerPredictor(pl.LightningModule):
         return {'loss': loss, 'y_pred': y_hat, 'y_true': y}
 
     def validation_step(self, batch, batch_idx):
-                    
+
         attn_mask = batch['attn_mask']
         attn_mask = attn_mask[:, :self.hparams.ctx_len]
-                
+
         phenotype = batch['phenotype']
         cl = batch['cell_line']
         y = batch['label']
         perturbations_type = batch['pert_type']
-                        
+
         perturbations = []
         for pert in range(1, self.hparams.ctx_len - (2 if not self.hparams.simpler else 0)):
             perturbations.append(batch[f'iv{pert}'].to(torch.float32))

@@ -271,4 +271,32 @@ def check_valid(df):
     if 'cell_line' not in df.columns:
         raise ValueError("Dataset must have a cellular context in a column labeled `cell_line`.")
     if 'negative' in df.iv1.values:
-        raise ValueError("Dataset still contains the negative label, please specify negative_gene or negative_drug.")    
+        raise ValueError("Dataset still contains the negative label, please specify negative_gene or negative_drug.")
+
+
+def get_data_by_setting(setting, genes_prior=None, cell_lines_prior=None, phenotype_prior=None):
+    """Placeholder function for getting data by setting.
+    
+    This function needs to be implemented based on your specific data requirements.
+    """
+    # This is a placeholder - you'll need to implement this based on your data structure
+    import pandas as pd
+    data_label = pd.DataFrame()  # Replace with actual data loading logic
+    gene_prior = genes_prior
+    cl_prior = cell_lines_prior  
+    phe_prior = phenotype_prior
+    path = f"data/{setting}"
+    return data_label, gene_prior, cl_prior, phe_prior, path
+
+
+def get_split_indices(data_label, leaveout_method, seed):
+    """Placeholder function for getting split indices.
+    
+    This function needs to be implemented based on your splitting strategy.
+    """
+    # This is a placeholder - you'll need to implement this based on your splitting logic
+    import numpy as np
+    np.random.seed(seed)
+    n_samples = len(data_label) if hasattr(data_label, '__len__') else 100
+    # Return a simple list of indices for now
+    return [list(range(n_samples))]
