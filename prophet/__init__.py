@@ -6,7 +6,7 @@ cell state, treatment, and functional readout components.
 
 Main Components:
     Prophet: Main model class for training and prediction
-    data_processing: Utilities for data splitting and preprocessing  
+    data_processing: Utilities for data splitting and preprocessing
     validation: Input validation and data quality checks
     config: Configuration management utilities
 
@@ -14,7 +14,7 @@ Quick Start:
     >>> from prophet import Prophet
     >>> model = Prophet(
     ...     iv_emb_path="interventions.csv",
-    ...     cl_emb_path="cell_lines.csv", 
+    ...     cl_emb_path="cell_lines.csv",
     ...     model_pth="trained_model.ckpt"
     ... )
     >>> predictions = model.predict(
@@ -27,16 +27,21 @@ Quick Start:
 # Core functionality (always available)
 from .core import Prophet, set_config
 
-# Data processing utilities  
-from .data import DataSplitter, DataProcessor, DataValidator, create_cross_validation_splits
+# Data processing utilities
+from .data import (
+    DataSplitter,
+    DataProcessor,
+    DataValidator,
+    create_cross_validation_splits,
+)
 
 # Validation utilities
 from .utils import (
-    ValidationError, 
-    DataFrameValidator, 
-    EmbeddingValidator, 
+    ValidationError,
+    DataFrameValidator,
+    EmbeddingValidator,
     ModelValidator,
-    validate_prophet_inputs
+    validate_prophet_inputs,
 )
 
 # Experimental space utilities
@@ -45,24 +50,22 @@ from .utils import (
     experimental_space_summary,
     save_experimental_space,
     interventions_x_cells,
-    cells_x_interventions
+    cells_x_interventions,
 )
 
 # Model hub utilities
-from .utils import (
-    list_available_models,
-    print_available_models
-)
+from .utils import list_available_models, print_available_models
 
 # Version info
 __version__ = "0.1.0"
 __author__ = "Alejandro Tejada-Lapuerta, Yuge Ji"
 
+
 def print_installation_info():
     """Print information about current Prophet installation."""
     print(f"Prophet v{__version__}")
     print("=" * 40)
-    
+
     print("✅ Complete Prophet installation includes:")
     print("  - Prophet model training and inference")
     print("  - Data processing utilities (DataSplitter, DataProcessor, DataValidator)")
@@ -72,39 +75,34 @@ def print_installation_info():
     print("  - Experiment tracking (Weights & Biases, TensorBoard)")
     print("\n🎉 Everything is ready to use!")
 
+
 __all__ = [
     # Core functionality
-    'Prophet', 
-    'set_config',
-    
+    "Prophet",
+    "set_config",
     # Data processing utilities
-    'DataSplitter',
-    'DataProcessor', 
-    'DataValidator',
-    'create_cross_validation_splits',
-    
+    "DataSplitter",
+    "DataProcessor",
+    "DataValidator",
+    "create_cross_validation_splits",
     # Validation utilities
-    'ValidationError',
-    'DataFrameValidator',
-    'EmbeddingValidator', 
-    'ModelValidator',
-    'validate_prophet_inputs',
-    
+    "ValidationError",
+    "DataFrameValidator",
+    "EmbeddingValidator",
+    "ModelValidator",
+    "validate_prophet_inputs",
     # Experimental space utilities
-    'create_experimental_space',
-    'experimental_space_summary',
-    'save_experimental_space',
-    'interventions_x_cells',
-    'cells_x_interventions',
-    
+    "create_experimental_space",
+    "experimental_space_summary",
+    "save_experimental_space",
+    "interventions_x_cells",
+    "cells_x_interventions",
     # Installation utilities
-    'print_installation_info',
-    
+    "print_installation_info",
     # Model hub utilities
-    'list_available_models',
-    'print_available_models',
-    
+    "list_available_models",
+    "print_available_models",
     # Package info
-    '__version__',
-    '__author__'
+    "__version__",
+    "__author__",
 ]

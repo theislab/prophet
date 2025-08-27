@@ -1,6 +1,10 @@
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
+from pytorch_lightning.callbacks import (
+    EarlyStopping,
+    ModelCheckpoint,
+    LearningRateMonitor,
+)
 import numpy as np
 import pandas as pd
 import warnings
@@ -16,46 +20,56 @@ from ..data import (
     remove_nonexistent_cat,
 )
 from ..models import load_models_config, TransformerPredictor
-from ..utils import ValidationError, validate_prophet_inputs, download_model_files, list_available_models, print_available_models
+from ..utils import (
+    ValidationError,
+    validate_prophet_inputs,
+    download_model_files,
+    list_available_models,
+    print_available_models,
+)
 from pytorch_lightning.callbacks import TQDMProgressBar
 from pytorch_lightning.loggers import WandbLogger
 import torch.optim as optim
 import types
+
 
 def inherit_docs_and_signature(from_method):
     def decorator(to_method):
         @functools.wraps(from_method)
         def wrapper(self, *args, **kwargs):
             return to_method(self, *args, **kwargs)
+
         wrapper.__doc__ = from_method.__doc__
         wrapper.__signature__ = from_method.__signature__
         return wrapper
+
     return decorator
+
 
 class Prophet:
     """Prophet: Transformer-based model for predicting cellular responses to perturbations.
-    
+
     Prophet decomposes biological experiments into three key components:
     1. Cell state (represented by cell line embeddings)
-    2. Treatment/intervention (represented by perturbation embeddings) 
+    2. Treatment/intervention (represented by perturbation embeddings)
     3. Functional readout (the phenotypic measurement being predicted)
-    
+
     The model can predict outcomes for drug treatments, genetic perturbations, and
     combinatorial interventions across different cell lines without requiring
     actual experiments to be performed.
-    
+
     Examples:
         Basic usage for inference:
         >>> model = Prophet(
         ...     iv_emb_path="gene_embeddings.csv",
-        ...     cl_emb_path="cell_line_embeddings.csv", 
+        ...     cl_emb_path="cell_line_embeddings.csv",
         ...     model_pth="trained_model.ckpt"
         ... )
         >>> predictions = model.predict(
         ...     target_ivs=["GENE1", "DRUG1"],
         ...     target_cls=["CELLLINE1", "CELLLINE2"]
         ... )
-        
+
         Fine-tuning on custom data:
         >>> model.train(
         ...     df=training_data,
@@ -65,7 +79,7 @@ class Prophet:
         ...     readout_col="response"
         ... )
     """
-    
+
     def __init__(
         self,
         iv_emb_path: Optional[Union[str, List[str]]] = None,
@@ -87,15 +101,15 @@ class Prophet:
                 was trained with explicit phenotype embeddings. Defaults to None.
             model_pth: Path to pre-trained model checkpoint (.ckpt file). Required for
                 inference and fine-tuning. Defaults to None.
-            architecture: Model architecture to use. Currently supports "Transformer" 
+            architecture: Model architecture to use. Currently supports "Transformer"
                 and "RandomForest". Defaults to "Transformer".
-                
+
         Raises:
             ValueError: If model was trained with explicit phenotype but ph_emb_path is None.
             ValueError: If architecture is not supported.
-            
+
         Note:
-            For inference or fine-tuning, model_pth must be provided. For training from 
+            For inference or fine-tuning, model_pth must be provided. For training from
             scratch, model_pth can be None (though pre-trained models are recommended).
         """
 
@@ -114,9 +128,13 @@ class Prophet:
             self.model_pth = model_pth
             self.model = self._build_model(architecture)
             self.phenotypes = self.model.hparams["phenotypes"]
-            self.iv_embedding, self.cl_embedding, self.ph_embedding = process_priors(self.iv_emb_path, self.cl_emb_path, self.ph_emb_path)
+            self.iv_embedding, self.cl_embedding, self.ph_embedding = process_priors(
+                self.iv_emb_path, self.cl_emb_path, self.ph_emb_path
+            )
             if self.model.hparams.explicit_phenotype and self.ph_embedding is None:
-                raise ValueError('model was run with explicit phenotype! must pass a ph_emb_path')
+                raise ValueError(
+                    "model was run with explicit phenotype! must pass a ph_emb_path"
+                )
 
     @classmethod
     def from_pretrained(
@@ -124,57 +142,59 @@ class Prophet:
         model_name: str,
         cache_dir: Optional[str] = None,
         force_download: bool = False,
-        **kwargs
+        **kwargs,
     ) -> "Prophet":
         """Load a pretrained Prophet model from HuggingFace Hub.
-        
+
         This is the easiest way to get started with Prophet! Simply specify a model name
         and all required files (model checkpoint, embeddings) will be automatically downloaded.
-        
+
         Args:
             model_name: Name of the pretrained model (e.g., "prophet-base", "prophet-large").
                 Use Prophet.list_models() to see available options.
             cache_dir: Directory to cache downloaded files. If None, uses default cache.
             force_download: Whether to force re-download even if files exist.
             **kwargs: Additional arguments passed to Prophet constructor.
-            
+
         Returns:
             Prophet model ready for inference or fine-tuning.
-            
+
         Raises:
             ValueError: If model_name is not available.
             ConnectionError: If download fails.
-            
+
         Examples:
             Load a pretrained model for immediate use:
             >>> model = Prophet.from_pretrained("prophet-base")
             >>> predictions = model.predict(data)
-            
+
             Use a different cache directory:
             >>> model = Prophet.from_pretrained("prophet-large", cache_dir="/my/cache")
-            
+
             See available models:
             >>> Prophet.list_models()
         """
         print(f"🔄 Downloading {model_name} from HuggingFace Hub...")
-        
+
         try:
             # Download model and embedding files
-            model_path, gene_emb_path, cell_emb_path, phenotype_emb_path = download_model_files(
-                model_name=model_name,
-                cache_dir=cache_dir,
-                force_download=force_download
+            model_path, gene_emb_path, cell_emb_path, phenotype_emb_path = (
+                download_model_files(
+                    model_name=model_name,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                )
             )
-            
+
             # Initialize Prophet with downloaded files
             return cls(
                 iv_emb_path=gene_emb_path,
                 cl_emb_path=cell_emb_path,
                 ph_emb_path=phenotype_emb_path,
                 model_pth=model_path,
-                **kwargs
+                **kwargs,
             )
-            
+
         except Exception as e:
             print(f"❌ Failed to load {model_name}: {str(e)}")
             print("\nAvailable models:")
@@ -184,10 +204,10 @@ class Prophet:
     @staticmethod
     def list_models() -> None:
         """Print available pretrained models.
-        
+
         Shows all Prophet models available for download from HuggingFace Hub
         with their descriptions and usage information.
-        
+
         Example:
             >>> Prophet.list_models()
         """
@@ -196,10 +216,10 @@ class Prophet:
     @staticmethod
     def available_models() -> Dict[str, Dict]:
         """Get programmatic access to available models.
-        
+
         Returns:
             Dictionary mapping model names to their metadata.
-            
+
         Example:
             >>> models = Prophet.available_models()
             >>> print(list(models.keys()))
@@ -213,21 +233,29 @@ class Prophet:
             return RandomForestRegressor()
         elif arch == "Transformer":
             self.torch_dataset = True
-            model = TransformerPredictor.load_from_checkpoint(checkpoint_path=self.model_pth, map_location=torch.device('cpu'))
-            
+            model = TransformerPredictor.load_from_checkpoint(
+                checkpoint_path=self.model_pth, map_location=torch.device("cpu")
+            )
+
             # Change learning rate for active learning
-            if hasattr(model, 'hparams') and 'lr' in model.hparams:
+            if hasattr(model, "hparams") and "lr" in model.hparams:
                 model.hparams.lr = 1e-5
                 model.hparams.weight_decay = 1e-6
                 print(f"Learning rate set to {model.hparams.lr}")
-            
+
             def configure_optimizers_no_scheduler(self):
-                optimizer = optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+                optimizer = optim.AdamW(
+                    self.parameters(),
+                    lr=self.hparams.lr,
+                    weight_decay=self.hparams.weight_decay,
+                )
                 return optimizer
-            
+
             # Bind the new method to the model instance
-            model.configure_optimizers = types.MethodType(configure_optimizers_no_scheduler, model)
-            
+            model.configure_optimizers = types.MethodType(
+                configure_optimizers_no_scheduler, model
+            )
+
             # working backwards from config
             if model.hparams.simpler:
                 self.pert_len = model.hparams.ctx_len - 1
@@ -250,15 +278,15 @@ class Prophet:
                 continue
             data_label = remove_nonexistent_cat(data_label, embedding, cols[i], verbose)
         data_label = data_label.reset_index(drop=True)
-        
+
         if len(data_label) == 0 and not verbose:
             self._remove_nonexistent_cat(data_label=data_label, verbose=True)
-            raise ValueError('labels did not match embeddings passed!')
+            raise ValueError("labels did not match embeddings passed!")
         return data_label
 
     def _init_input(
         self,
-        iv_col: Union[List[str], str] = ['iv1', 'iv2'],
+        iv_col: Union[List[str], str] = ["iv1", "iv2"],
         cl_col: str = "cell_line",
         ph_col: str = "phenotype",
         readout_col: str = "value",
@@ -268,7 +296,7 @@ class Prophet:
         """
         if isinstance(iv_col, str):
             iv_col = [iv_col]
-        intervention_mapping = {col: f"iv{i+1}" for i, col in enumerate(iv_col)}
+        intervention_mapping = {col: f"iv{i + 1}" for i, col in enumerate(iv_col)}
         self.iv_cols = list(intervention_mapping.values())
 
         # store the columns used for training for reference
@@ -281,20 +309,22 @@ class Prophet:
             self.cl_col: "cell_line",
             self.ph_col: "phenotype",
             self.readout_col: "value",
-            **intervention_mapping
+            **intervention_mapping,
         }
         if self.pert_len is None:
             self.pert_len = len(self.iv_cols)
         else:
             if self.pert_len != len(self.iv_cols):
-                raise ValueError(f"Are you sure you passed the right number of intervention columns? Currently receiving {self.iv_cols}")
+                raise ValueError(
+                    f"Are you sure you passed the right number of intervention columns? Currently receiving {self.iv_cols}"
+                )
 
     def train(
         self,
         df: pd.DataFrame,
-        iv_col: Union[List[str], str] = ['iv1', 'iv2'],
+        iv_col: Union[List[str], str] = ["iv1", "iv2"],
         cl_col: str = "cell_line",
-        ph_col: str = "phenotype", 
+        ph_col: str = "phenotype",
         readout_col: str = "value",
         model_config: Optional[dict] = None,
         val_df: Optional[pd.DataFrame] = None,
@@ -308,7 +338,7 @@ class Prophet:
         Args:
             df: DataFrame containing experimental data with the following required columns:
                 - Cell line identifiers (specified by cl_col)
-                - Intervention identifiers (specified by iv_col) 
+                - Intervention identifiers (specified by iv_col)
                 - Phenotype identifiers (specified by ph_col)
                 - Readout values (specified by readout_col)
             iv_col: Column name(s) for interventions. For single interventions, use a string
@@ -330,24 +360,24 @@ class Prophet:
             ValueError: If specified columns are not found in the DataFrame.
             ValueError: If intervention embeddings don't match the data.
             ValueError: If more than 2 interventions are specified.
-            
+
         Examples:
             Single intervention training:
             >>> model.train(
             ...     df=data,
             ...     iv_col="drug",
-            ...     cl_col="cell_line", 
+            ...     cl_col="cell_line",
             ...     ph_col="assay_type",
             ...     readout_col="response"
             ... )
-            
+
             Training with pre-split validation data:
             >>> model.train(
             ...     df=train_data,
             ...     val_df=val_data,
             ...     readout_col="response"
             ... )
-            
+
             Combinatorial intervention training:
             >>> model.train(
             ...     df=combo_data,
@@ -355,16 +385,16 @@ class Prophet:
             ...     cl_col="cell_line",
             ...     readout_col="synergy_score"
             ... )
-            
+
         Note:
             - For Transformer models, the method performs fine-tuning on a pre-trained checkpoint
             - If val_df is not provided, data is automatically split 90/10 for training/validation
             - Duplicate entries are automatically removed
             - Missing embeddings are automatically filtered out with warnings
         """
-        
+
         self._init_input(iv_col, cl_col, ph_col, readout_col)
-        
+
         # Data should already be clean and validated at this point
         # Just do basic column mapping and formatting
         df = df.rename(columns=self.column_map).copy()
@@ -388,17 +418,19 @@ class Prophet:
             split = dataloader_phenotypes(
                 gene_embedding=self.iv_embedding,
                 cell_lines_embedding=self.cl_embedding,
-                phenotype_embedding=self.ph_embedding if self.ph_embedding is not None else None,
+                phenotype_embedding=self.ph_embedding
+                if self.ph_embedding is not None
+                else None,
                 data_label=combined_data,
                 label_name="value",
                 index=(
-                    train_indices,   # train_indices
-                    valid_indices,   # valid_indices
-                    test_indices,    # test_indices (empty)
-                    ""               # cl_holdout
+                    train_indices,  # train_indices
+                    valid_indices,  # valid_indices
+                    test_indices,  # test_indices (empty)
+                    "",  # cl_holdout
                 ),
                 torch_dataset=self.torch_dataset,
-                pert_len=len(self.iv_cols)
+                pert_len=len(self.iv_cols),
             )
             X_train, y_train = split[0]  # This gets the training data
             self.model.fit(X_train, y_train)
@@ -409,14 +441,16 @@ class Prophet:
             split = dataloader_phenotypes(
                 gene_embedding=self.iv_embedding,
                 cell_lines_embedding=self.cl_embedding,
-                phenotype_embedding=self.ph_embedding if self.ph_embedding is not None else None,
+                phenotype_embedding=self.ph_embedding
+                if self.ph_embedding is not None
+                else None,
                 data_label=combined_data,
                 label_name="value",
                 index=(
-                    train_indices,   # train_indices
-                    valid_indices,   # valid_indices (for validation/early stopping)
-                    test_indices,    # test_indices (empty - no test set)
-                    ""               # cl_holdout
+                    train_indices,  # train_indices
+                    valid_indices,  # valid_indices (for validation/early stopping)
+                    test_indices,  # test_indices (empty - no test set)
+                    "",  # cl_holdout
                 ),
                 torch_dataset=self.torch_dataset,
                 pert_len=len(self.iv_cols),
@@ -425,7 +459,7 @@ class Prophet:
             )
 
             # Use existing model if available, otherwise load from config
-            if hasattr(self, 'model') and self.model is not None:
+            if hasattr(self, "model") and self.model is not None:
                 model = self.model
                 model = model.float()
 
@@ -435,24 +469,38 @@ class Prophet:
                     dirpath = model_config.dirpath
             else:
                 if model_config is None:
-                    raise ValueError("model_config is required when no pre-trained model is loaded")
-                model, model_config = load_models_config(model_config, seed=42, phenotypes=None)
+                    raise ValueError(
+                        "model_config is required when no pre-trained model is loaded"
+                    )
+                model, model_config = load_models_config(
+                    model_config, seed=42, phenotypes=None
+                )
                 self.model = model
                 model = model.float()
                 dirpath = model_config.dirpath
 
-            lr_monitor = LearningRateMonitor(logging_interval='step')
-            model_checkpointer = ModelCheckpoint(dirpath=dirpath, save_top_k=1, every_n_epochs=1, monitor='R2', mode='max')
+            lr_monitor = LearningRateMonitor(logging_interval="step")
+            model_checkpointer = ModelCheckpoint(
+                dirpath=dirpath,
+                save_top_k=1,
+                every_n_epochs=1,
+                monitor="R2",
+                mode="max",
+            )
             r2_callback = R2ScoreCallback(device=model.device, average=False)
-            early_stopping = EarlyStopping(monitor="R2", mode="max", patience=10, min_delta=0.0)
-            logger = WandbLogger(project="prophet", name="prophet-finetuned", save_dir="./wandb")
+            early_stopping = EarlyStopping(
+                monitor="R2", mode="max", patience=10, min_delta=0.0
+            )
+            logger = WandbLogger(
+                project="prophet", name="prophet-finetuned", save_dir="./wandb"
+            )
 
             callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
 
             trainer = pl.Trainer(
                 min_epochs=1,
                 max_steps=20000,
-                accelerator='gpu',
+                accelerator="gpu",
                 check_val_every_n_epoch=1,
                 callbacks=callbacks,
                 strategy="auto",
@@ -460,9 +508,12 @@ class Prophet:
                 log_every_n_steps=1,
                 deterministic=True,
                 enable_model_summary=False,
-                logger=logger)
+                logger=logger,
+            )
 
-            trainer.fit(model=model, train_dataloaders=split[0], val_dataloaders=split[1])
+            trainer.fit(
+                model=model, train_dataloaders=split[0], val_dataloaders=split[1]
+            )
 
             # Load the best checkpoint after training
             best_model_path = model_checkpointer.best_model_path
@@ -473,17 +524,18 @@ class Prophet:
             else:
                 print("No checkpoint was saved during training")
 
-    def _generate_predict_df(self,
-                             run_index: int,
-                             num_iterations: int,
-                             target_ivs: List[str],
-                             target_cls: List[str],
-                             target_phs: List[str] = ['_'],
-                             ):
+    def _generate_predict_df(
+        self,
+        run_index: int,
+        num_iterations: int,
+        target_ivs: List[str],
+        target_cls: List[str],
+        target_phs: List[str] = ["_"],
+    ):
         subset_cl = pd.DataFrame(target_cls, columns=["cell_line"])
         subset_iv = pd.DataFrame(target_ivs, columns=["iv"])
         if target_phs is None:
-            target_phs = ['_']
+            target_phs = ["_"]
         subset_ph = pd.DataFrame(target_phs, columns=["phenotype"])
         if len(self.iv_cols) > 2:
             raise ValueError(
@@ -492,7 +544,7 @@ class Prophet:
                 "For more complex interventions, please create a DataFrame with your "
                 "specific experimental combinations and use df mode instead."
             )
-        
+
         batch_size = int(len(subset_iv) // num_iterations)
         start_idx = run_index * batch_size
         end_idx = (
@@ -501,21 +553,30 @@ class Prophet:
             else len(subset_iv["iv"])
         )
 
-        data_label = pd.merge(subset_iv[["iv"]][start_idx:end_idx], subset_cl, how="cross")
+        data_label = pd.merge(
+            subset_iv[["iv"]][start_idx:end_idx], subset_cl, how="cross"
+        )
         data_label = pd.merge(data_label, subset_ph, how="cross")
-    
+
         if len(self.iv_cols) == 1:
             data_label.rename(columns={"iv": "iv1"}, inplace=True)
         else:
-            data_label = pd.merge(subset_iv[["iv"]], data_label, how="cross", suffixes=("1", "2"))
+            data_label = pd.merge(
+                subset_iv[["iv"]], data_label, how="cross", suffixes=("1", "2")
+            )
             # A+B and B+A should be the same, so we remove all duplicates in favor of A+B (was pretty sure this shouldn't exist in the implementation @John)
-            data_label['iv1+iv2'] = ['+'.join(sorted([row['iv1'], row['iv2']])) for _, row in data_label.iterrows()]
-            data_label = data_label.drop_duplicates(subset=['iv1+iv2', 'cell_line', 'phenotype'])
-        
-        data_label['value'] = '_'
-        
+            data_label["iv1+iv2"] = [
+                "+".join(sorted([row["iv1"], row["iv2"]]))
+                for _, row in data_label.iterrows()
+            ]
+            data_label = data_label.drop_duplicates(
+                subset=["iv1+iv2", "cell_line", "phenotype"]
+            )
+
+        data_label["value"] = "_"
+
         return data_label
-    
+
     def _decide_iteration_num(
         self,
         total_size: int,
@@ -546,13 +607,13 @@ class Prophet:
         """
         # Data should already be clean and validated
         # Just do basic column mapping
-        
+
         if self.column_map is not None:
             df = df.rename(columns=self.column_map).copy()
         df = df.reset_index(drop=True)
-        
+
         # Add dummy value column for dataloader
-        df['_'] = 0
+        df["_"] = 0
 
         # Create dataloader
         split = dataloader_phenotypes(
@@ -560,7 +621,7 @@ class Prophet:
             cell_lines_embedding=self.cl_embedding,
             phenotype_embedding=self.ph_embedding,
             data_label=df,
-            label_name='_',
+            label_name="_",
             index=(
                 np.array(df.index).tolist(),
                 [],
@@ -568,12 +629,19 @@ class Prophet:
                 "",
             ),
             torch_dataset=self.torch_dataset,
-            pert_len=self.pert_len
+            pert_len=self.pert_len,
         )
 
         # Get test dataloader
-        train_dataloader, valid_dataloader, test_dataloader, train_indices, test_indices, descriptor = split
-        
+        (
+            train_dataloader,
+            valid_dataloader,
+            test_dataloader,
+            train_indices,
+            test_indices,
+            descriptor,
+        ) = split
+
         print("--------------------------------")
         for batch in test_dataloader:
             print(batch)
@@ -585,10 +653,10 @@ class Prophet:
         predictions = trainer.predict(self.model, test_dataloader)
         predictions = [t[0] for t in predictions]
         predictions = torch.cat(predictions, dim=0)
-        
+
         # Add predictions to dataframe
         df["pred"] = predictions
-        df.drop(columns=['_'], inplace=True)
+        df.drop(columns=["_"], inplace=True)
 
         if save:
             df.to_parquet("prophet_predictions.parquet")

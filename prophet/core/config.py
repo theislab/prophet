@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Dict
 
+
 @dataclass
 class TransformerConfig:
     dim_cl: int = 300
@@ -32,15 +33,24 @@ class TransformerConfig:
             if hasattr(self, key):
                 setattr(self, key, value)
 
+
 @dataclass
 class Config:
     setting: str
     leaveout_method: str
-    dirpath: str = './ckpts/'
+    dirpath: str = "./ckpts/"
     ckpt_path: str = None
     project_name: str = "Prophet_hparams"
-    cell_lines_prior: List[str] = field(default_factory=lambda: ["./embeddings/cell_line_embedding_full_ccle_300_scaled.csv"])
-    genes_prior: List[str] = field(default_factory=lambda: ["./embeddings/ccle_T_pca_300_enformer_full_gene_mean_PCA_500_scaled.csv"] )
+    cell_lines_prior: List[str] = field(
+        default_factory=lambda: [
+            "./embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
+        ]
+    )
+    genes_prior: List[str] = field(
+        default_factory=lambda: [
+            "./embeddings/ccle_T_pca_300_enformer_full_gene_mean_PCA_500_scaled.csv"
+        ]
+    )
     phenotype_prior: List[str] = None
     unbalanced: bool = False
     pert_len: int = 2
@@ -51,23 +61,24 @@ class Config:
     ckpt_path = None
     fine_tune = False
     transformer: TransformerConfig = field(default_factory=TransformerConfig)
-    
+
     def update_from_dict(self, updates: Dict):
         for key, value in updates.items():
-            if key == 'Transformer' and isinstance(value, dict):
+            if key == "Transformer" and isinstance(value, dict):
                 self.transformer.update_from_dict(value)
             elif hasattr(self, key):
                 setattr(self, key, value)
 
+
 def set_config(models_config):
     config = Config(
-        setting=models_config['setting'],
-        leaveout_method=models_config['leaveout_method'],
+        setting=models_config["setting"],
+        leaveout_method=models_config["leaveout_method"],
     )
     config.update_from_dict(models_config)
 
     if config.transformer.simpler:
-       config.ctx_len = config.pert_len + 1
+        config.ctx_len = config.pert_len + 1
     else:
         config.ctx_len = config.pert_len + 3
     return config

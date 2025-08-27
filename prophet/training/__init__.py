@@ -10,7 +10,4 @@ from .callbacks import R2ScoreCallback
 # train_model.py contains the main training script but is not typically imported
 # as it's meant to be run as a script
 
-__all__ = [
-    'train_transformer',
-    'R2ScoreCallback'
-]
+__all__ = ["train_transformer", "R2ScoreCallback"]

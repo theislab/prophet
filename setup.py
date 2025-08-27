@@ -8,48 +8,42 @@ except FileNotFoundError:
     long_description = "Scalable and universal prediction of cellular phenotypes"
 
 setup(
-    name='prophet',
-    version='0.1.0',
+    name="prophet",
+    version="0.1.0",
     url="https://github.com/theislab/prophet",
-    license='CC-BY-NC 4.0',
-    description='Scalable and universal prediction of cellular phenotypes',
+    license="CC-BY-NC 4.0",
+    description="Scalable and universal prediction of cellular phenotypes",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author='Alejandro Tejada-Lapuerta, Yuge Ji',
-    author_email='alejandro.tejada@helmholtz-munich.de, yuge.ji@helmholtz-munich.de',
+    author="Alejandro Tejada-Lapuerta, Yuge Ji",
+    author_email="alejandro.tejada@helmholtz-munich.de, yuge.ji@helmholtz-munich.de",
     packages=find_packages(),
-    python_requires='>=3.10',
-    
+    python_requires=">=3.10",
     # All dependencies included - no extras needed
     install_requires=[
         # Core scientific computing
-        'numpy>=2.0.0,<3.0.0',
-        'pandas>=2.0.0,<3.0.0',
-        'scikit-learn>=1.3.0,<2.0.0',
-        'scipy>=1.10.0,<2.0.0',
-        'tqdm>=4.60.0',
-        'PyYAML>=6.0.0',
-        'joblib>=1.3.0',
-        
+        "numpy>=2.0.0,<3.0.0",
+        "pandas>=2.0.0,<3.0.0",
+        "scikit-learn>=1.3.0,<2.0.0",
+        "scipy>=1.10.0,<2.0.0",
+        "tqdm>=4.60.0",
+        "PyYAML>=6.0.0",
+        "joblib>=1.3.0",
         # Deep learning framework
-        'torch>=2.0.0,<3.0.0',
-        'pytorch_lightning>=2.0.0,<3.0.0',
-        'torchmetrics>=1.0.0,<2.0.0',
-        
+        "torch>=2.0.0,<3.0.0",
+        "pytorch_lightning>=2.0.0,<3.0.0",
+        "torchmetrics>=1.0.0,<2.0.0",
         # Visualization and notebooks
-        'matplotlib>=3.5.0',
-        'seaborn>=0.12.0',
-        'plotly>=5.0.0',
-        'jupyterlab>=4.0.0',
-        
+        "matplotlib>=3.5.0",
+        "seaborn>=0.12.0",
+        "plotly>=5.0.0",
+        "jupyterlab>=4.0.0",
         # Experiment tracking
-        'wandb>=0.15.0',
-        'tensorboard>=2.10.0',
-        
+        "wandb>=0.15.0",
+        "tensorboard>=2.10.0",
         # Model downloading and sharing
-        'huggingface_hub>=0.15.0',
+        "huggingface_hub>=0.15.0",
     ],
-    
     # Package metadata
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -63,18 +57,16 @@ setup(
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
-    
     # Keywords for package discovery
     keywords=[
-        "machine learning", 
-        "biology", 
-        "drug discovery", 
-        "cell biology", 
+        "machine learning",
+        "biology",
+        "drug discovery",
+        "cell biology",
         "perturbations",
         "transformer",
-        "predictions"
+        "predictions",
     ],
-    
     # Include package data
     include_package_data=True,
 )

@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
 
+
 class PhenotypeDataset(Dataset):
     """
     Dataset that gathers multiple phenotypes. The splits are done before. Experimental_data is the dataframe with the train, test or validation data.
     Each train, test or validation data is a different PhenotypeDataset dataset with different 'experimental_data' according to the splits
     """
+
     def __init__(
         self,
         experimental_data: pd.DataFrame,
@@ -16,7 +18,7 @@ class PhenotypeDataset(Dataset):
         phenotype_embeddings: pd.DataFrame = None,
         phenotypes: list = None,
         cl_embedding: bool = False,
-        pert_len: int = 2
+        pert_len: int = 2,
     ):
         """
         Args:
@@ -29,34 +31,48 @@ class PhenotypeDataset(Dataset):
             pert_len (int): number of perturbations to provide to the model, context length will be pert_len + 2, which comes from phenotype + cell_type
         """
         # precompute the attention mask
-        self.attn_mask = [[False]*experimental_data.shape[0]] # always pay attention to CLS, which is first token
+        self.attn_mask = [
+            [False] * experimental_data.shape[0]
+        ]  # always pay attention to CLS, which is first token
         for i in range(1, pert_len + 1):
-            col = f'iv{i}'
-            mask_values = experimental_data[col].isin(['negative_drug', 'negative_gene']).values  # mask if negative
+            col = f"iv{i}"
+            mask_values = (
+                experimental_data[col].isin(["negative_drug", "negative_gene"]).values
+            )  # mask if negative
             self.attn_mask.append(mask_values)
-        self.attn_mask.append([False]*experimental_data.shape[0])  # once for cell_line
-        self.attn_mask.append([False]*experimental_data.shape[0])  # once for phenotype
+        self.attn_mask.append(
+            [False] * experimental_data.shape[0]
+        )  # once for cell_line
+        self.attn_mask.append(
+            [False] * experimental_data.shape[0]
+        )  # once for phenotype
         self.attn_mask = np.array(self.attn_mask).T
 
-        columns = ['cell_line', 'phenotype'] + [f'iv{i}' for i in range(1, pert_len + 1)]
+        columns = ["cell_line", "phenotype"] + [
+            f"iv{i}" for i in range(1, pert_len + 1)
+        ]
         self.experimental_data = experimental_data[columns].values  # ordered
         self.labels = experimental_data[label_key].values
-        self.iv = iv_embeddings.iloc[:, 1:].values        
-        self.iv_embs_types = iv_embeddings.iloc[:, 0].values 
+        self.iv = iv_embeddings.iloc[:, 1:].values
+        self.iv_embs_types = iv_embeddings.iloc[:, 0].values
         self.cell_line = cell_line_embeddings.values
         self.iv_to_index = dict(zip(iv_embeddings.index, range(iv_embeddings.shape[0])))
-        self.cl_to_index = dict(zip(cell_line_embeddings.index, range(cell_line_embeddings.shape[0])))
+        self.cl_to_index = dict(
+            zip(cell_line_embeddings.index, range(cell_line_embeddings.shape[0]))
+        )
 
         # special handling for phenotypes
         self.ph_to_index = dict(zip(phenotypes, range(len(phenotypes))))
         if phenotype_embeddings is not None:
-            phenotype_embeddings = phenotype_embeddings.T[phenotypes].T  # reorder the embedding so that ph_to_index matches
+            phenotype_embeddings = phenotype_embeddings.T[
+                phenotypes
+            ].T  # reorder the embedding so that ph_to_index matches
             self.phenotype_embeddings = phenotype_embeddings.values
         else:
             self.phenotype_embeddings = None
-        
+
         self.pert_len = pert_len
-        
+
         # print("Interventions: ", self.iv.shape)
         # print("Cell line: ", self.cell_line.shape)
         # print("Order of phenotypes: ", phenotypes)
@@ -86,26 +102,35 @@ class PhenotypeDataset(Dataset):
         for i in range(2, self.pert_len + 2):
             name = item[i]  # perturbation name
             emb_entry = self.iv[self.iv_to_index[name]]
-            iv_type.append(emb_entry[0]) # first item of the embedding is 'gene' or 'drug'
-            iv_values_dict[f'iv{i-1}'] = emb_entry.astype('float64') # use all dimensions but the first one
+            iv_type.append(
+                emb_entry[0]
+            )  # first item of the embedding is 'gene' or 'drug'
+            iv_values_dict[f"iv{i - 1}"] = emb_entry.astype(
+                "float64"
+            )  # use all dimensions but the first one
 
-        # if there isn't phenotype embedding 
+        # if there isn't phenotype embedding
         if self.phenotype_embeddings is None:
-            context = self.ph_to_index[phenotype] # retrieve index
-            context = context + 1 # CLS is 0 
-            context = 54 # hardcode for now
-        else: # if there's embedding
-            context = self.phenotype_embeddings[self.ph_to_index[phenotype]] # retrieve embedding
+            context = self.ph_to_index[phenotype]  # retrieve index
+            context = context + 1  # CLS is 0
+            context = 54  # hardcode for now
+        else:  # if there's embedding
+            context = self.phenotype_embeddings[
+                self.ph_to_index[phenotype]
+            ]  # retrieve embedding
 
         # Gene = 0, Drug = 1
-        iv_types = [0 if item == 'gene' else (1 if item == 'drug' else item) for item in iv_type]
+        iv_types = [
+            0 if item == "gene" else (1 if item == "drug" else item) for item in iv_type
+        ]
         iv_types = np.array(iv_types)
 
-        return {'phenotype': context, # sometimes an int, sometimes an embedidng
-                'cell_line': self.cell_line[self.cl_to_index[cell_line]],
-                'label': self.labels[idx].astype(np.float32),
-                'attn_mask': self.attn_mask[idx],
-                'idx': idx,
-                'pert_type': iv_types, 
-                **iv_values_dict
+        return {
+            "phenotype": context,  # sometimes an int, sometimes an embedidng
+            "cell_line": self.cell_line[self.cl_to_index[cell_line]],
+            "label": self.labels[idx].astype(np.float32),
+            "attn_mask": self.attn_mask[idx],
+            "idx": idx,
+            "pert_type": iv_types,
+            **iv_values_dict,
         }
