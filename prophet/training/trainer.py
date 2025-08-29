@@ -164,7 +164,7 @@ class ProphetTrainer:
         """Create stratified split assignments ensuring equal contribution from each dataset (by phenotype)."""
         
         # Get phenotype column
-        ph_col = self.config['data']['phenotype']
+        ph_col = self.config['data']['ph_col']
         
         # Get unique phenotypes (datasets)
         unique_phenotypes = df[ph_col].unique()
