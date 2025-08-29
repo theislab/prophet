@@ -70,9 +70,9 @@ class R2ScoreCallback(pl.Callback):
         targets = torch.cat(self.targets, dim=0)
         phenotypes = torch.cat(self.phenotype_validation, dim=0)
 
-        predictions = predictions.cpu().numpy()
-        targets = targets.cpu().numpy()
-        phenotypes = phenotypes.cpu().numpy()
+        predictions = predictions.detach().cpu().numpy()
+        targets = targets.detach().cpu().numpy()
+        phenotypes = phenotypes.detach().cpu().numpy()
 
         if self.average:
             r2_scores = 0
@@ -92,9 +92,9 @@ class R2ScoreCallback(pl.Callback):
             r2_total = r2_scores / len(unique_phe)
             spearman_total = spearman_scores / len(unique_phe)
 
-            self.log("R2", r2_total, sync_dist=True, batch_size=predictions.shape[0])
+            self.log("R2_validation", r2_total, sync_dist=True, batch_size=predictions.shape[0])
             self.log(
-                "Spearman",
+                "Spearman_validation",
                 spearman_total,
                 sync_dist=True,
                 batch_size=predictions.shape[0],
@@ -102,11 +102,11 @@ class R2ScoreCallback(pl.Callback):
 
         else:
             r2 = r2_score(targets, predictions)
-            self.log("R2", r2, sync_dist=True, batch_size=predictions.shape[0])
+            self.log("R2_validation", r2, sync_dist=True, batch_size=predictions.shape[0])
 
             spearman = spearmanr(predictions, targets).statistic
             self.log(
-                "Spearman", spearman, sync_dist=True, batch_size=predictions.shape[0]
+                "Spearman_validation", spearman, sync_dist=True, batch_size=predictions.shape[0]
             )
 
         self.predictions = []
@@ -117,8 +117,8 @@ class R2ScoreCallback(pl.Callback):
         predictions = torch.cat(self.prediction_train, dim=0)
         targets = torch.cat(self.targets_train, dim=0)
 
-        predictions = predictions.cpu().numpy()
-        targets = targets.cpu().numpy()
+        predictions = predictions.detach().cpu().numpy()
+        targets = targets.detach().cpu().numpy()
 
         r2 = r2_score(targets, predictions)
         self.log("R2_train", r2, sync_dist=True, batch_size=predictions.shape[0])
@@ -135,8 +135,8 @@ class R2ScoreCallback(pl.Callback):
         predictions = torch.cat(self.prediction_test, dim=0)
         targets = torch.cat(self.targets_test, dim=0)
 
-        predictions = predictions.cpu().numpy()
-        targets = targets.cpu().numpy()
+        predictions = predictions.detach().cpu().numpy()
+        targets = targets.detach().cpu().numpy()
 
         r2 = r2_score(targets, predictions)
         self.log("R2_test", r2, sync_dist=True, batch_size=predictions.shape[0])

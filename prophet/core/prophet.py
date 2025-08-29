@@ -454,7 +454,7 @@ class Prophet:
             X_train, y_train = split[0]  # This gets the training data
             self.model.fit(X_train, y_train)
         else:
-            # Create dataloader with test set
+            # Create dataloader with test setj
             unbalanced = getattr(model_config, 'unbalanced', False) if model_config else False
             split = dataloader_phenotypes(
                 gene_embedding=self.iv_embedding,
@@ -472,7 +472,7 @@ class Prophet:
                 pert_len=len(self.iv_cols),
                 valid_set=True,
                 test_set=len(test_indices) > 0,
-                batch_size=16,
+                batch_size=model_config.batch_size,
                 unbalanced=unbalanced,
             )
             print(f"Using unbalanced sampling: {unbalanced}")
@@ -505,14 +505,14 @@ class Prophet:
                 dirpath=dirpath,
                 save_top_k=1,
                 every_n_epochs=1,
-                monitor="R2",
+                monitor="R2_validation",
                 mode="max",
             )
             r2_average = getattr(model_config, 'r2_average', False) if model_config else False
             r2_callback = R2ScoreCallback(device=model.device, average=r2_average)
             print(f"R2 average: {r2_average}")
             early_stopping = EarlyStopping(
-                monitor="R2", mode="max", patience=10, min_delta=0.0
+                monitor="R2_validation", mode="max", patience=10, min_delta=0.0
             )
 
             if wandb_config is None:
@@ -556,7 +556,7 @@ class Prophet:
                 deterministic=True,
                 enable_model_summary=True,
                 logger=logger,
-                #profiler="pytorch",
+                num_sanity_val_steps=0,
                 gradient_clip_val=1.0,
             )
 
