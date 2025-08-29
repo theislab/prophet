@@ -399,16 +399,17 @@ def _convert_strings_to_lowercase(df: pd.DataFrame, cl_col: str) -> pd.DataFrame
     """Convert string columns to lowercase efficiently."""
     string_columns = df.select_dtypes(include=["object"]).columns
     string_columns = [col for col in string_columns if col != cl_col]
-    
+
     if string_columns:
         # Vectorized operation on all columns at once
         df_copy = df.copy()
         df_copy[string_columns] = df_copy[string_columns].apply(
-            lambda x: x.str.lower() if x.dtype == 'object' else x
+            lambda x: x.str.lower() if x.dtype == "object" else x
         )
         return df_copy
-    
+
     return df
+
 
 def _remove_nonexistent_categories(
     df: pd.DataFrame,
@@ -420,35 +421,35 @@ def _remove_nonexistent_categories(
     ph_col: str,
 ) -> pd.DataFrame:
     """Remove rows with nonexistent categories efficiently."""
-    
+
     # Build comprehensive filter in one pass
     mask = pd.Series(True, index=df.index)
-    
+
     # Check intervention columns
     if isinstance(iv_col, str):
         iv_cols = [iv_col]
     else:
         iv_cols = iv_col
-    
+
     valid_ivs = sorted(set(iv_embedding.index))
     valid_ivs_set = set(valid_ivs)  # Convert back to set for fast lookup
-    
+
     for col in iv_cols:
         if col in df.columns:
             mask &= df[col].isin(valid_ivs_set)
-    
+
     # Check cell line column
     if cl_col in df.columns:
         valid_cls = sorted(set(cl_embedding.index))
         valid_cls_set = set(valid_cls)  # Convert back to set for fast lookup
         mask &= df[cl_col].isin(valid_cls_set)
-    
+
     # Check phenotype column
     if ph_embedding is not None and ph_col in df.columns:
         valid_phs = sorted(set(ph_embedding.index))
         valid_phs_set = set(valid_phs)  # Convert back to set for fast lookup
         mask &= df[ph_col].isin(valid_phs_set)
-    
+
     return df[mask].copy()
 
 
@@ -538,12 +539,12 @@ def validate_prophet_inputs(
 
         # Convert strings to lowercase efficiently
         df_validated = _convert_strings_to_lowercase(df_validated, cl_col)
-        
+
         # Process priors
         iv_embedding, cl_embedding, ph_embedding = process_priors(
             iv_emb_path, cl_emb_path, ph_emb_path
         )
-        
+
         # Remove nonexistent categories in one efficient pass
         df_validated = _remove_nonexistent_categories(
             df_validated,
@@ -554,9 +555,9 @@ def validate_prophet_inputs(
             cl_col,
             ph_col,
         )
-        
+
         # Single reset_index at the end
         df_validated = df_validated.reset_index(drop=True)
         results["processed_inputs"]["df"] = df_validated
-    
+
     return results

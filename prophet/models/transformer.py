@@ -168,8 +168,8 @@ class TransformerPredictor(pl.LightningModule):
         Inputs:
             x - Input features of shape [Batch, SeqLen, 1]
         """
-        cl = cl[:, :self.hparams.dim_cl]
-        perturbations = perturbations[:, :, :self.hparams.dim_iv]
+        cl = cl[:, : self.hparams.dim_cl]
+        perturbations = perturbations[:, :, : self.hparams.dim_iv]
         attn_mask = attn_mask[:, : self.hparams.ctx_len]
 
         if self.hparams.explicit_phenotype:

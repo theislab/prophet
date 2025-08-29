@@ -16,5 +16,5 @@ def set_seeds(seed: int):
     torch.backends.cudnn.benchmark = False
     os.environ["PYTHONHASHSEED"] = str(seed)
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    if hasattr(torch, 'use_deterministic_algorithms'):
+    if hasattr(torch, "use_deterministic_algorithms"):
         torch.use_deterministic_algorithms(True, warn_only=True)

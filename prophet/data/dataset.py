@@ -10,7 +10,9 @@ class StratifiedPhenotypeSampler(Sampler):
     This avoids PyTorch's 16M limit while ensuring balanced representation of all phenotypes.
     """
 
-    def __init__(self, data: pd.DataFrame, indices: list, batch_size: int, key: str = 'phenotype'):
+    def __init__(
+        self, data: pd.DataFrame, indices: list, batch_size: int, key: str = "phenotype"
+    ):
         """
         Args:
             data: DataFrame containing the experimental data
@@ -102,19 +104,25 @@ class PhenotypeDataset(Dataset):
         self.pert_len = pert_len
 
         # Store labels as contiguous float32 array for better performance
-        self.labels = np.ascontiguousarray(experimental_data[label_key].values, dtype=np.float32)
+        self.labels = np.ascontiguousarray(
+            experimental_data[label_key].values, dtype=np.float32
+        )
 
         # Pre-compute attention mask efficiently (small memory footprint)
         self.attn_mask = self._precompute_attention_masks(experimental_data, pert_len)
 
         # Store embeddings in contiguous memory with optimal dtypes
-        self.iv = np.ascontiguousarray(iv_embeddings.iloc[:, 1:].values, dtype=np.float32)
+        self.iv = np.ascontiguousarray(
+            iv_embeddings.iloc[:, 1:].values, dtype=np.float32
+        )
         self.type_to_int = {"gene": 0, "drug": 1}
         iv_embs_types_str = iv_embeddings.iloc[:, 0].values
         self.iv_embs_types = np.array(
             [self.type_to_int.get(s, -1) for s in iv_embs_types_str], dtype=np.int8
         )
-        self.cell_line = np.ascontiguousarray(cell_line_embeddings.values, dtype=np.float32)
+        self.cell_line = np.ascontiguousarray(
+            cell_line_embeddings.values, dtype=np.float32
+        )
 
         # Create optimized mapping dictionaries using numpy arrays for faster lookup
         iv_names = iv_embeddings.index.values
@@ -122,31 +130,47 @@ class PhenotypeDataset(Dataset):
 
         self.iv_to_index = dict(zip(iv_names, np.arange(len(iv_names), dtype=np.int32)))
         self.cl_to_index = dict(zip(cl_names, np.arange(len(cl_names), dtype=np.int32)))
-        self.ph_to_index = dict(zip(phenotypes, np.arange(len(phenotypes), dtype=np.int32)))
+        self.ph_to_index = dict(
+            zip(phenotypes, np.arange(len(phenotypes), dtype=np.int32))
+        )
 
         # Handle phenotype embeddings
         if phenotype_embeddings is not None:
             phenotype_embeddings = phenotype_embeddings.T[phenotypes].T  # reorder
-            self.phenotype_embeddings = np.ascontiguousarray(phenotype_embeddings.values, dtype=np.float32)
+            self.phenotype_embeddings = np.ascontiguousarray(
+                phenotype_embeddings.values, dtype=np.float32
+            )
         else:
             self.phenotype_embeddings = None
 
         # Pre-convert experimental data strings to integer indices for faster lookups
-        columns = ["cell_line", "phenotype"] + [f"iv{i}" for i in range(1, pert_len + 1)]
+        columns = ["cell_line", "phenotype"] + [
+            f"iv{i}" for i in range(1, pert_len + 1)
+        ]
 
         # Use a temporary DataFrame for mapping
         exp_data_indices = pd.DataFrame(index=experimental_data.index)
-        exp_data_indices["cell_line"] = experimental_data["cell_line"].map(self.cl_to_index)
-        exp_data_indices["phenotype"] = experimental_data["phenotype"].map(self.ph_to_index)
+        exp_data_indices["cell_line"] = experimental_data["cell_line"].map(
+            self.cl_to_index
+        )
+        exp_data_indices["phenotype"] = experimental_data["phenotype"].map(
+            self.ph_to_index
+        )
         for i in range(1, pert_len + 1):
-            exp_data_indices[f"iv{i}"] = experimental_data[f"iv{i}"].map(self.iv_to_index)
+            exp_data_indices[f"iv{i}"] = experimental_data[f"iv{i}"].map(
+                self.iv_to_index
+            )
 
-        self.experimental_data_indices = np.ascontiguousarray(exp_data_indices[columns].values, dtype=np.int32)
+        self.experimental_data_indices = np.ascontiguousarray(
+            exp_data_indices[columns].values, dtype=np.int32
+        )
 
         # Pre-compute type conversion mapping for faster access
         self.type_to_int = {"gene": 0, "drug": 1}
 
-    def _precompute_attention_masks(self, experimental_data: pd.DataFrame, pert_len: int) -> np.ndarray:
+    def _precompute_attention_masks(
+        self, experimental_data: pd.DataFrame, pert_len: int
+    ) -> np.ndarray:
         """Pre-compute all attention masks - only ~220MB for 55M samples."""
         masks = []
 
@@ -156,7 +180,9 @@ class PhenotypeDataset(Dataset):
         # Intervention masks
         for i in range(1, pert_len + 1):
             col = f"iv{i}"
-            mask_values = experimental_data[col].isin(["negative_drug", "negative_gene"]).values
+            mask_values = (
+                experimental_data[col].isin(["negative_drug", "negative_gene"]).values
+            )
             masks.append(mask_values)
 
         # Cell line and phenotype masks (always False - pay attention)

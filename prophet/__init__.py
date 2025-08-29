@@ -11,6 +11,6 @@ from .training import ProphetTrainer, set_seeds
 __version__ = "1.0.0"
 __all__ = [
     "Prophet",
-    "ProphetTrainer", 
+    "ProphetTrainer",
     "set_seeds",
 ]

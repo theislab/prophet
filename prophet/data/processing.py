@@ -102,7 +102,7 @@ class DataSplitter:
 
         This ensures that held-out interventions don't appear in ANY position
         in the training data, preventing data leakage. For example, if 'drugA'
-        is held out, it will be removed from ALL rows where it appears in 
+        is held out, it will be removed from ALL rows where it appears in
         iv1, iv2, or any other intervention column.
 
         Args:
@@ -128,9 +128,9 @@ class DataSplitter:
         n_holdout = int(len(all_interventions) * holdout_fraction)
 
         np.random.seed(random_state)
-        holdout_interventions = set(np.random.choice(
-            all_interventions, size=n_holdout, replace=False
-        ))
+        holdout_interventions = set(
+            np.random.choice(all_interventions, size=n_holdout, replace=False)
+        )
 
         # Create mask for rows that contain ANY holdout intervention
         holdout_mask = pd.Series(False, index=df.index)

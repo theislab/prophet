@@ -117,7 +117,7 @@ class Prophet:
         self.phenotypes = None
         self.column_map = None
         self.pert_len = None
-        self.config = config # Store the config
+        self.config = config  # Store the config
 
         if model_pth and architecture == "RandomForest":
             self.model = load(model_pth)
@@ -230,19 +230,19 @@ class Prophet:
             return RandomForestRegressor()
         elif arch == "Transformer":
             self.torch_dataset = True
-            
+
             if self.model_pth is not None:
                 # Load from checkpoint (fine-tuning)
                 model = TransformerPredictor.load_from_checkpoint(
                     checkpoint_path=self.model_pth, map_location=torch.device("cpu")
                 )
-                
+
                 # Change learning rate for active learning
                 if hasattr(model, "hparams") and "lr" in model.hparams:
                     model.hparams.lr = 1e-5
                     model.hparams.weight_decay = 1e-6
                     print(f"Learning rate set to {model.hparams.lr}")
-                
+
                 # Override optimizer configuration for fine-tuning (disable scheduler)
                 def configure_optimizers_no_scheduler(self):
                     optimizer = optim.AdamW(
@@ -256,13 +256,13 @@ class Prophet:
                 model.configure_optimizers = types.MethodType(
                     configure_optimizers_no_scheduler, model
                 )
-                
+
             else:
                 # Create new model from scratch
                 from ..models import load_models_config
-                
+
                 # Use seed from config, fallback to 42 if not available
-                seed = getattr(self.config, 'random_seed', 42)
+                seed = getattr(self.config, "random_seed", 42)
                 model, _ = load_models_config(self.config, seed=seed)
 
             # working backwards from config
@@ -412,11 +412,13 @@ class Prophet:
         # Data should already be clean and validated at this point
         df = df.rename(columns=self.column_map).copy()
         val_df = val_df.rename(columns=self.column_map).copy()
-        
+
         if test_df is not None:
             test_df = test_df.rename(columns=self.column_map).copy()
             test_df = test_df.reset_index(drop=True)
-            test_indices = np.arange(len(df) + len(val_df), len(df) + len(val_df) + len(test_df))
+            test_indices = np.arange(
+                len(df) + len(val_df), len(df) + len(val_df) + len(test_df)
+            )
         else:
             test_df = pd.DataFrame()
             test_indices = []
@@ -431,7 +433,9 @@ class Prophet:
         print("Fitting model.")
         if not self.torch_dataset:
             # For non-PyTorch models (like RandomForest)
-            unbalanced = getattr(model_config, 'unbalanced', False) if model_config else False
+            unbalanced = (
+                getattr(model_config, "unbalanced", False) if model_config else False
+            )
             split = dataloader_phenotypes(
                 gene_embedding=self.iv_embedding,
                 cell_lines_embedding=self.cl_embedding,
@@ -455,7 +459,9 @@ class Prophet:
             self.model.fit(X_train, y_train)
         else:
             # Create dataloader with test setj
-            unbalanced = getattr(model_config, 'unbalanced', False) if model_config else False
+            unbalanced = (
+                getattr(model_config, "unbalanced", False) if model_config else False
+            )
             split = dataloader_phenotypes(
                 gene_embedding=self.iv_embedding,
                 cell_lines_embedding=self.cl_embedding,
@@ -463,10 +469,10 @@ class Prophet:
                 data_label=combined_data,
                 label_name="value",
                 index=(
-                    train_indices,      # train_indices
-                    valid_indices,      # valid_indices
+                    train_indices,  # train_indices
+                    valid_indices,  # valid_indices
                     test_indices,
-                    "",                 # cl_holdout
+                    "",  # cl_holdout
                 ),
                 torch_dataset=self.torch_dataset,
                 pert_len=len(self.iv_cols),
@@ -498,7 +504,11 @@ class Prophet:
                 )
                 self.model = model
                 model = model.float()
-                dirpath = checkpoint_dirpath if checkpoint_dirpath is not None else model_config.dirpath
+                dirpath = (
+                    checkpoint_dirpath
+                    if checkpoint_dirpath is not None
+                    else model_config.dirpath
+                )
 
             lr_monitor = LearningRateMonitor(logging_interval="step")
             model_checkpointer = ModelCheckpoint(
@@ -508,7 +518,9 @@ class Prophet:
                 monitor="R2_validation",
                 mode="max",
             )
-            r2_average = getattr(model_config, 'r2_average', False) if model_config else False
+            r2_average = (
+                getattr(model_config, "r2_average", False) if model_config else False
+            )
             r2_callback = R2ScoreCallback(device=model.device, average=r2_average)
             print(f"R2 average: {r2_average}")
             early_stopping = EarlyStopping(
@@ -517,7 +529,7 @@ class Prophet:
 
             if wandb_config is None:
                 wandb_config = {}
-            
+
             # Default WandB settings
             default_wandb = {
                 "project": "prophet",
@@ -525,12 +537,12 @@ class Prophet:
                 "name": "prophet-training",
                 "tags": [],
                 "notes": None,
-                "save_dir": "./wandb"
+                "save_dir": "./wandb",
             }
-            
+
             # Update with provided config
             default_wandb.update(wandb_config)
-            
+
             # Create WandB logger
             logger = WandbLogger(
                 project=default_wandb["project"],
@@ -538,7 +550,7 @@ class Prophet:
                 name=default_wandb["name"],
                 tags=default_wandb["tags"],
                 notes=default_wandb["notes"],
-                save_dir=default_wandb["save_dir"]
+                save_dir=default_wandb["save_dir"],
             )
 
             callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
@@ -563,7 +575,7 @@ class Prophet:
             print(
                 f"Dataset sizes:\n"
                 f"  Training:    {len(split[0].dataset.labels):,d} samples\n"
-                f"  Validation:  {len(split[1].dataset.labels):,d} samples\n" 
+                f"  Validation:  {len(split[1].dataset.labels):,d} samples\n"
                 f"  Test:        {len(split[2].dataset.labels):,d} samples"
             )
             trainer.fit(
@@ -582,7 +594,9 @@ class Prophet:
             # 🆕 NEW: Evaluate on test set if provided
             if len(test_indices) > 0:
                 print("Evaluating on test set...")
-                test_results = trainer.test(model, split[2])  # split[2] is already test dataloader
+                test_results = trainer.test(
+                    model, split[2]
+                )  # split[2] is already test dataloader
                 print(f"✅ Test set evaluation completed!")
                 print(f"   Test metrics: {test_results}")
 

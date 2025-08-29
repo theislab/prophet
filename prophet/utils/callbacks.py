@@ -92,7 +92,12 @@ class R2ScoreCallback(pl.Callback):
             r2_total = r2_scores / len(unique_phe)
             spearman_total = spearman_scores / len(unique_phe)
 
-            self.log("R2_validation", r2_total, sync_dist=True, batch_size=predictions.shape[0])
+            self.log(
+                "R2_validation",
+                r2_total,
+                sync_dist=True,
+                batch_size=predictions.shape[0],
+            )
             self.log(
                 "Spearman_validation",
                 spearman_total,
@@ -102,11 +107,16 @@ class R2ScoreCallback(pl.Callback):
 
         else:
             r2 = r2_score(targets, predictions)
-            self.log("R2_validation", r2, sync_dist=True, batch_size=predictions.shape[0])
+            self.log(
+                "R2_validation", r2, sync_dist=True, batch_size=predictions.shape[0]
+            )
 
             spearman = spearmanr(predictions, targets).statistic
             self.log(
-                "Spearman_validation", spearman, sync_dist=True, batch_size=predictions.shape[0]
+                "Spearman_validation",
+                spearman,
+                sync_dist=True,
+                batch_size=predictions.shape[0],
             )
 
         self.predictions = []
