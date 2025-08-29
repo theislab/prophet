@@ -32,6 +32,8 @@ from .model_hub import (
     check_model_availability,
 )
 
+from .callbacks import R2ScoreCallback, CosineWarmupScheduler
+
 __all__ = [
     # Validation
     "ValidationError",
@@ -51,4 +53,6 @@ __all__ = [
     "get_model_info",
     "print_available_models",
     "check_model_availability",
+    "R2ScoreCallback",
+    "CosineWarmupScheduler",
 ]

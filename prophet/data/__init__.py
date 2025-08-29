@@ -8,8 +8,6 @@ functionality for the Prophet transformer model.
 # Core data loading functionality
 from .dataloader import (
     dataloader_phenotypes,
-    get_split_indices,
-    get_data_by_setting,
     process_priors,
     remove_nonexistent_cat,
     universal_processing,
@@ -26,11 +24,12 @@ from .processing import (
     create_cross_validation_splits,
 )
 
+# Dataset registry for predefined dataset combinations
+from .dataset_registry import DatasetRegistry, dataset_registry
+
 __all__ = [
     # Data loading
     "dataloader_phenotypes",
-    "get_split_indices",
-    "get_data_by_setting",
     "process_priors",
     "remove_nonexistent_cat",
     "universal_processing",
@@ -41,4 +40,7 @@ __all__ = [
     "DataProcessor",
     "DataValidator",
     "create_cross_validation_splits",
+    # Dataset registry
+    "DatasetRegistry",
+    "dataset_registry",
 ]

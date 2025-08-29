@@ -7,10 +7,8 @@ from pytorch_lightning.callbacks import (
 )
 import numpy as np
 import pandas as pd
-import warnings
-from tqdm import tqdm
 from typing import List, Union, Optional, Dict
-from ..training.callbacks import R2ScoreCallback
+from ..utils import R2ScoreCallback
 import functools
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
@@ -21,13 +19,10 @@ from ..data import (
 )
 from ..models import load_models_config, TransformerPredictor
 from ..utils import (
-    ValidationError,
-    validate_prophet_inputs,
     download_model_files,
     list_available_models,
     print_available_models,
 )
-from pytorch_lightning.callbacks import TQDMProgressBar
 from pytorch_lightning.loggers import WandbLogger
 import torch.optim as optim
 import types
@@ -87,6 +82,7 @@ class Prophet:
         ph_emb_path: Optional[Union[str, List[str]]] = None,
         model_pth: Optional[str] = None,
         architecture: str = "Transformer",
+        config: Optional[object] = None,  # Add config parameter
     ) -> None:
         """Initialize the Prophet model.
 
@@ -121,6 +117,7 @@ class Prophet:
         self.phenotypes = None
         self.column_map = None
         self.pert_len = None
+        self.config = config # Store the config
 
         if model_pth and architecture == "RandomForest":
             self.model = load(model_pth)
@@ -233,28 +230,40 @@ class Prophet:
             return RandomForestRegressor()
         elif arch == "Transformer":
             self.torch_dataset = True
-            model = TransformerPredictor.load_from_checkpoint(
-                checkpoint_path=self.model_pth, map_location=torch.device("cpu")
-            )
-
-            # Change learning rate for active learning
-            if hasattr(model, "hparams") and "lr" in model.hparams:
-                model.hparams.lr = 1e-5
-                model.hparams.weight_decay = 1e-6
-                print(f"Learning rate set to {model.hparams.lr}")
-
-            def configure_optimizers_no_scheduler(self):
-                optimizer = optim.AdamW(
-                    self.parameters(),
-                    lr=self.hparams.lr,
-                    weight_decay=self.hparams.weight_decay,
+            
+            if self.model_pth is not None:
+                # Load from checkpoint (fine-tuning)
+                model = TransformerPredictor.load_from_checkpoint(
+                    checkpoint_path=self.model_pth, map_location=torch.device("cpu")
                 )
-                return optimizer
+                
+                # Change learning rate for active learning
+                if hasattr(model, "hparams") and "lr" in model.hparams:
+                    model.hparams.lr = 1e-5
+                    model.hparams.weight_decay = 1e-6
+                    print(f"Learning rate set to {model.hparams.lr}")
+                
+                # Override optimizer configuration for fine-tuning (disable scheduler)
+                def configure_optimizers_no_scheduler(self):
+                    optimizer = optim.AdamW(
+                        self.parameters(),
+                        lr=self.hparams.lr,
+                        weight_decay=self.hparams.weight_decay,
+                    )
+                    return optimizer
 
-            # Bind the new method to the model instance
-            model.configure_optimizers = types.MethodType(
-                configure_optimizers_no_scheduler, model
-            )
+                # Bind the new method to the model instance
+                model.configure_optimizers = types.MethodType(
+                    configure_optimizers_no_scheduler, model
+                )
+                
+            else:
+                # Create new model from scratch
+                from ..models import load_models_config
+                
+                # Use seed from config, fallback to 42 if not available
+                seed = getattr(self.config, 'random_seed', 42)
+                model, _ = load_models_config(self.config, seed=seed)
 
             # working backwards from config
             if model.hparams.simpler:
@@ -328,6 +337,9 @@ class Prophet:
         readout_col: str = "value",
         model_config: Optional[dict] = None,
         val_df: Optional[pd.DataFrame] = None,
+        test_df: Optional[pd.DataFrame] = None,
+        wandb_config: Optional[dict] = None,
+        checkpoint_dirpath: Optional[str] = None,
     ) -> None:
         """Train or fine-tune the Prophet model on experimental data.
 
@@ -355,6 +367,8 @@ class Prophet:
             val_df: Optional validation DataFrame. If provided, this will be used for validation
                 instead of automatically splitting the training data. Must have the same column
                 structure as df.
+            wandb_config: Optional dictionary with WandB configuration.
+                         Keys: project, entity, name, tags, notes, save_dir
 
         Raises:
             ValueError: If specified columns are not found in the DataFrame.
@@ -396,25 +410,28 @@ class Prophet:
         self._init_input(iv_col, cl_col, ph_col, readout_col)
 
         # Data should already be clean and validated at this point
-        # Just do basic column mapping and formatting
         df = df.rename(columns=self.column_map).copy()
         val_df = val_df.rename(columns=self.column_map).copy()
+        
+        if test_df is not None:
+            test_df = test_df.rename(columns=self.column_map).copy()
+            test_df = test_df.reset_index(drop=True)
+            test_indices = np.arange(len(df) + len(val_df), len(df) + len(val_df) + len(test_df))
+        else:
+            test_df = pd.DataFrame()
+            test_indices = []
 
-        # Basic formatting (duplicates should already be removed)
-        df = df.reset_index(drop=True)
-        val_df = val_df.reset_index(drop=True)
-
-        # Combine training and validation data
-        combined_data = pd.concat([df, val_df], ignore_index=True)
+        # Combine all data
+        combined_data = pd.concat([df, val_df, test_df], ignore_index=True)
 
         # Create indices for the combined dataset
         train_indices = np.arange(len(df))
         valid_indices = np.arange(len(df), len(df) + len(val_df))
-        test_indices = []  # No test set
 
         print("Fitting model.")
         if not self.torch_dataset:
             # For non-PyTorch models (like RandomForest)
+            unbalanced = getattr(model_config, 'unbalanced', False) if model_config else False
             split = dataloader_phenotypes(
                 gene_embedding=self.iv_embedding,
                 cell_lines_embedding=self.cl_embedding,
@@ -426,44 +443,48 @@ class Prophet:
                 index=(
                     train_indices,  # train_indices
                     valid_indices,  # valid_indices
-                    test_indices,  # test_indices (empty)
+                    test_indices,  # test_indices
                     "",  # cl_holdout
                 ),
                 torch_dataset=self.torch_dataset,
                 pert_len=len(self.iv_cols),
+                unbalanced=unbalanced,
             )
+            print(f"Using unbalanced sampling: {unbalanced}")
             X_train, y_train = split[0]  # This gets the training data
             self.model.fit(X_train, y_train)
         else:
-            print("pytorch model, finetuning")
-
-            # Create dataloader for PyTorch models
+            # Create dataloader with test set
+            unbalanced = getattr(model_config, 'unbalanced', False) if model_config else False
             split = dataloader_phenotypes(
                 gene_embedding=self.iv_embedding,
                 cell_lines_embedding=self.cl_embedding,
-                phenotype_embedding=self.ph_embedding
-                if self.ph_embedding is not None
-                else None,
+                phenotype_embedding=self.ph_embedding,
                 data_label=combined_data,
                 label_name="value",
                 index=(
-                    train_indices,  # train_indices
-                    valid_indices,  # valid_indices (for validation/early stopping)
-                    test_indices,  # test_indices (empty - no test set)
-                    "",  # cl_holdout
+                    train_indices,      # train_indices
+                    valid_indices,      # valid_indices
+                    test_indices,
+                    "",                 # cl_holdout
                 ),
                 torch_dataset=self.torch_dataset,
                 pert_len=len(self.iv_cols),
                 valid_set=True,
+                test_set=len(test_indices) > 0,
                 batch_size=16,
+                unbalanced=unbalanced,
             )
+            print(f"Using unbalanced sampling: {unbalanced}")
 
             # Use existing model if available, otherwise load from config
             if hasattr(self, "model") and self.model is not None:
                 model = self.model
                 model = model.float()
 
-                if model_config is None:
+                if checkpoint_dirpath is not None:
+                    dirpath = checkpoint_dirpath
+                elif model_config is None:
                     dirpath = "./checkpoints"
                 else:
                     dirpath = model_config.dirpath
@@ -477,7 +498,7 @@ class Prophet:
                 )
                 self.model = model
                 model = model.float()
-                dirpath = model_config.dirpath
+                dirpath = checkpoint_dirpath if checkpoint_dirpath is not None else model_config.dirpath
 
             lr_monitor = LearningRateMonitor(logging_interval="step")
             model_checkpointer = ModelCheckpoint(
@@ -487,30 +508,64 @@ class Prophet:
                 monitor="R2",
                 mode="max",
             )
-            r2_callback = R2ScoreCallback(device=model.device, average=False)
+            r2_average = getattr(model_config, 'r2_average', False) if model_config else False
+            r2_callback = R2ScoreCallback(device=model.device, average=r2_average)
+            print(f"R2 average: {r2_average}")
             early_stopping = EarlyStopping(
                 monitor="R2", mode="max", patience=10, min_delta=0.0
             )
+
+            if wandb_config is None:
+                wandb_config = {}
+            
+            # Default WandB settings
+            default_wandb = {
+                "project": "prophet",
+                "entity": None,  # Use default entity
+                "name": "prophet-training",
+                "tags": [],
+                "notes": None,
+                "save_dir": "./wandb"
+            }
+            
+            # Update with provided config
+            default_wandb.update(wandb_config)
+            
+            # Create WandB logger
             logger = WandbLogger(
-                project="prophet", name="prophet-finetuned", save_dir="./wandb"
+                project=default_wandb["project"],
+                entity=default_wandb["entity"],
+                name=default_wandb["name"],
+                tags=default_wandb["tags"],
+                notes=default_wandb["notes"],
+                save_dir=default_wandb["save_dir"]
             )
 
             callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
 
             trainer = pl.Trainer(
                 min_epochs=1,
-                max_steps=20000,
+                max_steps=model_config.max_steps,
                 accelerator="gpu",
+                devices=-1,
                 check_val_every_n_epoch=1,
                 callbacks=callbacks,
-                strategy="auto",
-                enable_progress_bar=False,
+                strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
+                enable_progress_bar=True,
                 log_every_n_steps=1,
                 deterministic=True,
-                enable_model_summary=False,
+                enable_model_summary=True,
                 logger=logger,
+                #profiler="pytorch",
+                gradient_clip_val=1.0,
             )
 
+            print(
+                f"Dataset sizes:\n"
+                f"  Training:    {len(split[0].dataset.labels):,d} samples\n"
+                f"  Validation:  {len(split[1].dataset.labels):,d} samples\n" 
+                f"  Test:        {len(split[2].dataset.labels):,d} samples"
+            )
             trainer.fit(
                 model=model, train_dataloaders=split[0], val_dataloaders=split[1]
             )
@@ -523,6 +578,13 @@ class Prophet:
                 self.model = model
             else:
                 print("No checkpoint was saved during training")
+
+            # 🆕 NEW: Evaluate on test set if provided
+            if len(test_indices) > 0:
+                print("Evaluating on test set...")
+                test_results = trainer.test(model, split[2])  # split[2] is already test dataloader
+                print(f"✅ Test set evaluation completed!")
+                print(f"   Test metrics: {test_results}")
 
     def _generate_predict_df(
         self,
@@ -641,12 +703,6 @@ class Prophet:
             test_indices,
             descriptor,
         ) = split
-
-        print("--------------------------------")
-        for batch in test_dataloader:
-            print(batch)
-            break
-        print("--------------------------------")
 
         # Make predictions
         trainer = pl.Trainer(devices=1)

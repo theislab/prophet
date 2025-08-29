@@ -1,0 +1,62 @@
+# Cross-Validation with Intervention Holdout
+# Configuration for leave-intervention-out cross-validation
+
+# === DATA CONFIGURATION ===
+data:
+  data_path: "./data/my_dataset.csv"
+  iv_embeddings: ["./embeddings/drug_embeddings.csv", "./embeddings/gene_embeddings.csv"]
+  cl_embeddings: ["./embeddings/cell_embeddings.csv"]
+  ph_embeddings: null
+  
+  iv_cols: ["iv1", "iv2"]
+  cl_col: "cell_line"
+  ph_col: "phenotype"
+  readout_col: "value"
+
+# === TRAINING MODE ===
+mode: "scratch"
+checkpoint_path: null
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "leave_iv_out"         # Leave interventions out
+  val_fraction: 0.15
+  n_splits: 5                    # 5-fold cross-validation
+  run_cv: true                   # Run full cross-validation
+
+# === RANDOMIZATION ===
+random_seed: 42
+
+# === OUTPUT ===
+output_dir: "./cv_intervention_holdout_models"
+
+# === MODEL CONFIGURATION ===
+max_steps: 30000               # Shorter training for CV
+batch_size: 256                # Smaller batch for faster training
+early_stopping: true
+patience: 10                   # Less patience for faster training
+pert_len: 2
+
+Transformer:
+  dim_cl: 300
+  dim_iv: 500
+  dim_phe: 300
+  model_dim: 256
+  num_heads: 8
+  num_layers: 4
+  simpler: false
+  lr: 1e-4
+  weight_decay: 0.01
+  warmup: 3000                   # Shorter warmup
+  max_iters: 30000
+  iv_dropout: 0.1
+  cl_dropout: 0.1
+  ph_dropout: 0.1
+  regressor_dropout: 0.1
+  dropout: 0.1
+  pool: cls
+  mask: true
+  sum: false
+  explicit_phenotype: false
+  linear_predictor: false
+  tokenizer_layers: 2

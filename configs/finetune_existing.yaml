@@ -1,0 +1,68 @@
+# Fine-tuning Existing Prophet Model
+# Configuration for fine-tuning a pre-trained model
+
+# === DATA CONFIGURATION ===
+data:
+  data_path: "./data/new_domain_data.csv"
+  iv_embeddings: ["./embeddings/drug_embeddings.csv"]
+  cl_embeddings: ["./embeddings/cell_embeddings.csv"]
+  ph_embeddings: null
+  
+  iv_cols: ["iv1", "iv2"]
+  cl_col: "cell_line"
+  ph_col: "phenotype"
+  readout_col: "value"
+
+# === TRAINING MODE ===
+mode: "finetune"
+checkpoint_path: "./pretrained_models/prophet_base.ckpt"  # Required for fine-tuning
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "random"               # Simple random split for fine-tuning
+  val_fraction: 0.2              # Larger validation set for fine-tuning
+  n_splits: 1
+  run_cv: false
+
+# === RANDOMIZATION ===
+random_seed: 42
+
+# === OUTPUT ===
+output_dir: "./finetuned_models"
+
+# === MODEL CONFIGURATION ===
+max_steps: 10000               # Shorter training for fine-tuning
+batch_size: 256
+early_stopping: true
+patience: 5                    # Early stopping for fine-tuning
+pert_len: 2
+
+Transformer:
+  # Architecture should match pre-trained model
+  dim_cl: 300
+  dim_iv: 500
+  dim_phe: 300
+  model_dim: 256
+  num_heads: 8
+  num_layers: 4
+  simpler: false
+  
+  # Fine-tuning specific parameters
+  lr: 1e-5                     # Lower learning rate for fine-tuning
+  weight_decay: 1e-6           # Lower weight decay
+  warmup: 1000                 # Shorter warmup
+  max_iters: 10000
+  
+  # Reduced dropout for fine-tuning
+  iv_dropout: 0.05
+  cl_dropout: 0.05
+  ph_dropout: 0.05
+  regressor_dropout: 0.05
+  dropout: 0.05
+  
+  pool: cls
+  mask: true
+  sum: false
+  explicit_phenotype: false
+  linear_predictor: false
+  tokenizer_layers: 2

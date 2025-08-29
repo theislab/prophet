@@ -98,43 +98,48 @@ class DataSplitter:
         holdout_fraction: float = 0.2,
         random_state: int = 42,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """Split data by holding out specific interventions for testing.
+        """Split data by holding out individual interventions completely.
 
-        This evaluates how well the model can predict effects of novel
-        interventions not seen during training.
+        This ensures that held-out interventions don't appear in ANY position
+        in the training data, preventing data leakage. For example, if 'drugA'
+        is held out, it will be removed from ALL rows where it appears in 
+        iv1, iv2, or any other intervention column.
 
         Args:
             df: Input DataFrame containing experimental data.
             iv_cols: Column name(s) containing intervention identifiers.
-            holdout_fraction: Fraction of interventions to hold out for testing.
+            holdout_fraction: Fraction of individual interventions to hold out for testing.
             random_state: Random seed for reproducibility.
 
         Returns:
-            Tuple of (train_df, test_df).
+            Tuple of (train_df, test_df) where test_df contains all rows
+            with any held-out interventions.
         """
         if isinstance(iv_cols, str):
             iv_cols = [iv_cols]
 
-        # Get unique intervention combinations
-        intervention_combinations = df[iv_cols].drop_duplicates()
-        n_holdout = int(len(intervention_combinations) * holdout_fraction)
+        # Get ALL unique interventions across all intervention columns
+        all_interventions = set()
+        for col in iv_cols:
+            all_interventions.update(df[col].dropna().unique())
+
+        # Convert to list and randomly select holdout interventions
+        all_interventions = sorted(list(all_interventions))
+        n_holdout = int(len(all_interventions) * holdout_fraction)
 
         np.random.seed(random_state)
-        holdout_indices = np.random.choice(
-            len(intervention_combinations), size=n_holdout, replace=False
-        )
-        holdout_interventions = intervention_combinations.iloc[holdout_indices]
+        holdout_interventions = set(np.random.choice(
+            all_interventions, size=n_holdout, replace=False
+        ))
 
-        # Create test set with holdout interventions
-        test_mask = pd.Series(False, index=df.index)
-        for _, row in holdout_interventions.iterrows():
-            mask = pd.Series(True, index=df.index)
-            for col in iv_cols:
-                mask &= df[col] == row[col]
-            test_mask |= mask
+        # Create mask for rows that contain ANY holdout intervention
+        holdout_mask = pd.Series(False, index=df.index)
+        for col in iv_cols:
+            holdout_mask |= df[col].isin(holdout_interventions)
 
-        test_df = df[test_mask].copy()
-        train_df = df[~test_mask].copy()
+        # Split the data
+        test_df = df[holdout_mask].copy()
+        train_df = df[~holdout_mask].copy()
 
         return train_df, test_df
 

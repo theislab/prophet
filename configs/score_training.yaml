@@ -1,0 +1,70 @@
+# Training on SCORE dataset using predefined setting
+# This is much simpler than specifying all the paths manually!
+
+# === DATA CONFIGURATION ===
+data:
+  # Use predefined SCORE dataset setting
+  setting: "everything"
+  
+  # Column specifications (always required)
+  iv_cols: ["iv1", "iv2"]
+  cl_col: "cell_line"
+  ph_col: "phenotype"
+  readout_col: "value"
+
+
+output_dir: "/lustre/groups/ml01/projects/super_rad_project/prophet_pretrained_public/checkpoints"
+
+# === TRAINING MODE ===
+mode: "scratch"
+checkpoint_path: null
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "leave_iv_out"
+  val_fraction: 0.15
+  n_splits: 5
+  run_cv: true
+
+# === RANDOMIZATION ===
+random_seed: 42
+
+# === WANDB CONFIGURATION ===
+wandb:
+  project: "Prophet_GDSC_Training"      # Your project name
+  entity: "phenopred"                # Your WandB username/team
+  save_dir: "./wandb_logs"              # Local save directory
+
+# === MODEL CONFIGURATION ===
+# General training settings
+max_steps: 3000000
+batch_size: 8192
+early_stopping: true
+patience: 15
+pert_len: 2
+r2_average: true
+unbalanced: false
+
+Transformer:
+  dim_cl: 300
+  dim_iv: 1219
+  dim_phe: 300
+  model_dim: 512
+  num_heads: 8
+  num_layers: 8
+  simpler: false
+  lr: 0.0001
+  weight_decay: 0.01
+  warmup: 5000
+  max_iters: 3000000
+  iv_dropout: 0.1
+  cl_dropout: 0.1
+  ph_dropout: 0.1
+  regressor_dropout: 0.1
+  dropout: 0.1
+  pool: cls
+  mask: true
+  sum: false
+  explicit_phenotype: false
+  linear_predictor: false
+  tokenizer_layers: 2

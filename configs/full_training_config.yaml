@@ -1,0 +1,75 @@
+# Complete Prophet Training Configuration
+# This file contains all parameters needed for training
+
+# === DATA CONFIGURATION ===
+data:
+  # Required paths
+  data_path: "./data/my_dataset.csv"                    # Training data (CSV/Parquet)
+  iv_embeddings: ["./embeddings/drug_embeddings.csv"]   # Intervention embeddings (list)
+  cl_embeddings: ["./embeddings/cell_embeddings.csv"]   # Cell line embeddings (list)  
+  ph_embeddings: null                                   # Phenotype embeddings (optional)
+  
+  # Column specifications
+  iv_cols: ["iv1", "iv2"]        # Intervention column names
+  cl_col: "cell_line"            # Cell line column name
+  ph_col: "phenotype"            # Phenotype column name
+  readout_col: "value"           # Response/readout column name
+
+# === TRAINING MODE ===
+mode: "scratch"                  # "scratch" or "finetune"
+checkpoint_path: null            # Required for fine-tuning mode
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "random"               # random, leave_iv_out, leave_cl_out, leave_one_iv_out, leave_one_cl_out
+  val_fraction: 0.15             # For random splits
+  n_splits: 5                    # Number of KFold splits for cross-validation
+  run_cv: false                  # Whether to run cross-validation (multiple splits)
+
+# === RANDOMIZATION ===
+random_seed: 42                  # Random seed for reproducibility
+
+# === OUTPUT ===
+output_dir: "./trained_models"   # Directory for model outputs
+
+# === MODEL CONFIGURATION ===
+# General training settings
+max_steps: 50000
+batch_size: 512
+early_stopping: true
+patience: 15
+pert_len: 2
+
+# Transformer architecture
+Transformer:
+  # Model dimensions
+  dim_cl: 300                    # Cell line embedding dimension
+  dim_iv: 500                    # Intervention embedding dimension
+  dim_phe: 300                   # Phenotype embedding dimension
+  model_dim: 256                 # Hidden model dimension
+  
+  # Architecture
+  num_heads: 8                   # Number of attention heads
+  num_layers: 4                  # Number of transformer layers
+  simpler: false                 # Use simplified architecture
+  
+  # Training parameters
+  lr: 1e-4                       # Learning rate
+  weight_decay: 0.01
+  warmup: 5000                   # Warmup steps
+  max_iters: 50000               # Maximum training iterations
+  
+  # Dropout rates
+  iv_dropout: 0.1
+  cl_dropout: 0.1
+  ph_dropout: 0.1
+  regressor_dropout: 0.1
+  dropout: 0.1
+  
+  # Other settings
+  pool: cls                      # Pooling strategy
+  mask: true                     # Use attention masking
+  sum: false                     # Use sum pooling
+  explicit_phenotype: false      # Use explicit phenotype embeddings
+  linear_predictor: false
+  tokenizer_layers: 2

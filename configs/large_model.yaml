@@ -1,0 +1,73 @@
+# Configuration for large Prophet models
+# Use this for high-capacity models with more parameters
+
+# === DATA CONFIGURATION ===
+data:
+  data_path: "./data/large_dataset.csv"
+  iv_embeddings: ["./embeddings/drug_embeddings.csv", "./embeddings/gene_embeddings.csv"]
+  cl_embeddings: ["./embeddings/cell_embeddings.csv"]
+  ph_embeddings: ["./embeddings/phenotype_embeddings.csv"]
+  
+  iv_cols: ["iv1", "iv2"]
+  cl_col: "cell_line"
+  ph_col: "phenotype"
+  readout_col: "value"
+
+# === TRAINING MODE ===
+mode: "scratch"
+checkpoint_path: null
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "random"
+  val_fraction: 0.15
+  n_splits: 5
+  run_cv: false
+
+# === RANDOMIZATION ===
+random_seed: 42
+
+# === OUTPUT ===
+output_dir: "./large_models"
+
+# === MODEL CONFIGURATION ===
+# Training hyperparameters for large models
+max_steps: 100000              # More training steps for large models
+batch_size: 256                # Smaller batch size for memory constraints
+early_stopping: true
+patience: 25                   # More patience for large models
+pert_len: 2
+
+# Transformer architecture for large models
+Transformer:
+  # Larger model dimensions
+  dim_cl: 512                  # Larger cell line embeddings
+  dim_iv: 1024                 # Larger intervention embeddings
+  dim_phe: 512                 # Larger phenotype embeddings
+  model_dim: 512               # Larger hidden dimension
+  
+  # Deeper architecture
+  num_heads: 16                # More attention heads
+  num_layers: 8                # More transformer layers
+  simpler: false               # Full architecture
+  
+  # Training parameters
+  lr: 5e-5                     # Lower learning rate for stability
+  weight_decay: 0.01
+  warmup: 10000                # Longer warmup for large models
+  max_iters: 100000            # More iterations
+  
+  # Dropout rates
+  iv_dropout: 0.15
+  cl_dropout: 0.15
+  ph_dropout: 0.15
+  regressor_dropout: 0.15
+  dropout: 0.15
+  
+  # Other settings
+  pool: cls
+  mask: true
+  sum: false
+  explicit_phenotype: true     # Use explicit phenotype embeddings
+  linear_predictor: false
+  tokenizer_layers: 3

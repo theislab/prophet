@@ -1,0 +1,73 @@
+# Configuration for quick experiments and testing
+# Use this for fast iteration and debugging
+
+# === DATA CONFIGURATION ===
+data:
+  data_path: "./data/small_test_dataset.csv"
+  iv_embeddings: ["./embeddings/drug_embeddings.csv"]
+  cl_embeddings: ["./embeddings/cell_embeddings.csv"]
+  ph_embeddings: null
+  
+  iv_cols: ["iv1", "iv2"]
+  cl_col: "cell_line"
+  ph_col: "phenotype"
+  readout_col: "value"
+
+# === TRAINING MODE ===
+mode: "scratch"
+checkpoint_path: null
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "random"
+  val_fraction: 0.2
+  n_splits: 3
+  run_cv: false
+
+# === RANDOMIZATION ===
+random_seed: 42
+
+# === OUTPUT ===
+output_dir: "./quick_experiments"
+
+# === MODEL CONFIGURATION ===
+# Quick training hyperparameters
+max_steps: 5000                # Very short training for quick experiments
+batch_size: 128                # Small batch size for fast iteration
+early_stopping: true
+patience: 5                    # Quick early stopping
+pert_len: 2
+
+# Transformer configuration for quick experiments
+Transformer:
+  # Smaller model dimensions
+  dim_cl: 128                  # Smaller embeddings for speed
+  dim_iv: 256                  # Smaller embeddings for speed
+  dim_phe: 128                 # Smaller embeddings for speed
+  model_dim: 128               # Smaller hidden dimension
+  
+  # Lightweight architecture
+  num_heads: 4                 # Fewer attention heads
+  num_layers: 2                # Fewer transformer layers
+  simpler: true                # Simplified architecture
+  
+  # Training parameters
+  lr: 1e-3                     # Higher learning rate for faster convergence
+  weight_decay: 0.01
+  warmup: 100                  # Very short warmup
+  max_iters: 5000              # Few iterations
+  
+  # Dropout rates
+  iv_dropout: 0.1
+  cl_dropout: 0.1
+  ph_dropout: 0.1
+  regressor_dropout: 0.1
+  dropout: 0.1
+  
+  # Other settings
+  pool: cls
+  mask: true
+  sum: false
+  explicit_phenotype: false
+  linear_predictor: false
+  tokenizer_layers: 1

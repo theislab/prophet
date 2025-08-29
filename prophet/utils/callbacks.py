@@ -66,8 +66,8 @@ class R2ScoreCallback(pl.Callback):
         self.targets_test.append(y_true)
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        predictions = torch.cat(self.predictions, dim=0)  # .cpu().numpy()
-        targets = torch.cat(self.targets, dim=0)  # .cpu().numpy()
+        predictions = torch.cat(self.predictions, dim=0)
+        targets = torch.cat(self.targets, dim=0)
         phenotypes = torch.cat(self.phenotype_validation, dim=0)
 
         predictions = predictions.cpu().numpy()
@@ -114,13 +114,9 @@ class R2ScoreCallback(pl.Callback):
         self.phenotype_validation = []
 
     def on_train_epoch_end(self, trainer, pl_module):
-        predictions = torch.cat(self.prediction_train, dim=0)  # .cpu().numpy()
-        targets = torch.cat(self.targets_train, dim=0)  # .cpu().numpy()
+        predictions = torch.cat(self.prediction_train, dim=0)
+        targets = torch.cat(self.targets_train, dim=0)
 
-        targets_mean = targets.mean(0)
-        targets_mean = targets_mean.repeat(targets.shape[0])
-
-        targets_mean = targets_mean.cpu().numpy()
         predictions = predictions.cpu().numpy()
         targets = targets.cpu().numpy()
 
@@ -136,13 +132,9 @@ class R2ScoreCallback(pl.Callback):
         self.targets_train = []
 
     def on_test_epoch_end(self, trainer, pl_module):
-        predictions = torch.cat(self.prediction_test, dim=0)  # .cpu().numpy()
-        targets = torch.cat(self.targets_test, dim=0)  # .cpu().numpy()
+        predictions = torch.cat(self.prediction_test, dim=0)
+        targets = torch.cat(self.targets_test, dim=0)
 
-        targets_mean = targets.mean(0)
-        targets_mean = targets_mean.repeat(targets.shape[0])
-
-        targets_mean = targets_mean.cpu().numpy()
         predictions = predictions.cpu().numpy()
         targets = targets.cpu().numpy()
 

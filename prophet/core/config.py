@@ -60,6 +60,7 @@ class Config:
     patience: int = 20
     ckpt_path = None
     fine_tune = False
+    r2_average: bool = False
     transformer: TransformerConfig = field(default_factory=TransformerConfig)
 
     def update_from_dict(self, updates: Dict):

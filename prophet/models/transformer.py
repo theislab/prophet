@@ -3,7 +3,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from torch import optim
 import torch.nn.init as init
-from ..training.callbacks import CosineWarmupScheduler
+from ..utils.callbacks import CosineWarmupScheduler
 import logging
 
 from tqdm import tqdm
@@ -77,7 +77,7 @@ class TransformerPredictor(pl.LightningModule):
 
     def _create_model(self):
         self.learnable_embedding = torch.nn.Embedding(
-            num_embeddings=1000,
+            num_embeddings=2000,
             embedding_dim=self.hparams.model_dim,
             max_norm=0.5,
         )
@@ -168,8 +168,8 @@ class TransformerPredictor(pl.LightningModule):
         Inputs:
             x - Input features of shape [Batch, SeqLen, 1]
         """
-        cl = cl[:, : self.hparams.dim_cl]
-        perturbations = [pert[:, : self.hparams.dim_iv] for pert in perturbations]
+        cl = cl[:, :self.hparams.dim_cl]
+        perturbations = perturbations[:, :, :self.hparams.dim_iv]
         attn_mask = attn_mask[:, : self.hparams.ctx_len]
 
         if self.hparams.explicit_phenotype:
@@ -182,15 +182,8 @@ class TransformerPredictor(pl.LightningModule):
 
         # Drugs to drug network and genes to gene network
         # We mask the attention to the negative perturbations, so it's like not using the networks
-        drug_perturbations = [
-            self.drug_net(tensor).unsqueeze(1) for tensor in perturbations
-        ]  # all perts to drug
-        gene_perturbations = [
-            self.gene_net(tensor).unsqueeze(1) for tensor in perturbations
-        ]  # all perts to gene
-
-        drug_perturbations = torch.cat(drug_perturbations, dim=1)  # bs x n x dim
-        gene_perturbations = torch.cat(gene_perturbations, dim=1)  # bs x n x dim
+        drug_perturbations = self.drug_net(perturbations)
+        gene_perturbations = self.gene_net(perturbations)
 
         perturbations = torch.where(
             perturbations_type.unsqueeze(2) == 0, gene_perturbations, drug_perturbations
@@ -261,7 +254,7 @@ class TransformerPredictor(pl.LightningModule):
 
         # Cut CL and perturbations to number of selected dimensions
         cl = cl[:, : self.hparams.dim_cl]
-        perturbations = [pert[:, : self.hparams.dim_iv] for pert in perturbations]
+        perturbations = perturbations[:, :, : self.hparams.dim_iv]
         attn_mask = attn_mask[:, : self.hparams.ctx_len]
 
         if self.hparams.explicit_phenotype:
@@ -274,15 +267,8 @@ class TransformerPredictor(pl.LightningModule):
 
         # Drugs to drug network and genes to gene network
         # We mask the attention to the negative perturbations, so it's like not using the networks
-        drug_perturbations = [
-            self.drug_net(tensor).unsqueeze(1) for tensor in perturbations
-        ]  # all perts to drug
-        gene_perturbations = [
-            self.gene_net(tensor).unsqueeze(1) for tensor in perturbations
-        ]  # all perts to gene
-
-        drug_perturbations = torch.cat(drug_perturbations, dim=1)  # bs x n x dim
-        gene_perturbations = torch.cat(gene_perturbations, dim=1)  # bs x n x dim
+        drug_perturbations = self.drug_net(perturbations)
+        gene_perturbations = self.gene_net(perturbations)
 
         perturbations = torch.where(
             perturbations_type.unsqueeze(2) == 0, gene_perturbations, drug_perturbations
@@ -384,11 +370,7 @@ class TransformerPredictor(pl.LightningModule):
         y = batch["label"]
         perturbations_type = batch["pert_type"]
 
-        perturbations = []
-        for pert in range(
-            1, self.hparams.ctx_len - (2 if not self.hparams.simpler else 0)
-        ):
-            perturbations.append(batch[f"iv{pert}"].to(torch.float32))
+        perturbations = batch["perturbations"].to(torch.float32)
 
         if self.hparams.explicit_phenotype:
             phenotype, cl = phenotype.to(torch.float32), cl.to(torch.float32)
@@ -419,11 +401,7 @@ class TransformerPredictor(pl.LightningModule):
         y = batch["label"]
         perturbations_type = batch["pert_type"]
 
-        perturbations = []
-        for pert in range(
-            1, self.hparams.ctx_len - (2 if not self.hparams.simpler else 0)
-        ):
-            perturbations.append(batch[f"iv{pert}"].to(torch.float32))
+        perturbations = batch["perturbations"].to(torch.float32)
 
         if self.hparams.explicit_phenotype:
             phenotype, cl = phenotype.to(torch.float32), cl.to(torch.float32)
@@ -448,11 +426,7 @@ class TransformerPredictor(pl.LightningModule):
         y = batch["label"]
         perturbations_type = batch["pert_type"]
 
-        perturbations = []
-        for pert in range(
-            1, self.hparams.ctx_len - (2 if not self.hparams.simpler else 0)
-        ):
-            perturbations.append(batch[f"iv{pert}"].to(torch.float32))
+        perturbations = batch["perturbations"].to(torch.float32)
 
         if self.hparams.explicit_phenotype:
             phenotype, cl = phenotype.to(torch.float32), cl.to(torch.float32)
@@ -477,11 +451,7 @@ class TransformerPredictor(pl.LightningModule):
         names = batch["names"]
         perturbations_type = batch["pert_type"]
 
-        perturbations = []
-        for pert in range(
-            1, self.hparams.ctx_len - (2 if not self.hparams.simpler else 0)
-        ):
-            perturbations.append(batch[f"iv{pert}"].to(torch.float32))
+        perturbations = batch["perturbations"].to(torch.float32)
 
         x, cl = x.to(torch.int32), cl.to(torch.float32)
 
@@ -509,11 +479,7 @@ class TransformerPredictor(pl.LightningModule):
         y = batch["label"]
         perturbations_type = batch["pert_type"]
 
-        perturbations = []
-        for pert in range(
-            1, self.hparams.ctx_len - (2 if not self.hparams.simpler else 0)
-        ):
-            perturbations.append(batch[f"iv{pert}"].to(torch.float32))
+        perturbations = batch["perturbations"].to(torch.float32)
 
         if self.hparams.explicit_phenotype:
             phenotype, cl = phenotype.to(torch.float32), cl.to(torch.float32)

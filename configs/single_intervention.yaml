@@ -1,0 +1,73 @@
+# Configuration for single intervention experiments
+# Use this when your data has only one intervention per experiment (not combinations)
+
+# === DATA CONFIGURATION ===
+data:
+  data_path: "./data/single_intervention_data.csv"
+  iv_embeddings: ["./embeddings/intervention_embeddings.csv"]
+  cl_embeddings: ["./embeddings/cell_embeddings.csv"]
+  ph_embeddings: null
+  
+  iv_cols: ["iv1"]              # Only one intervention column
+  cl_col: "cell_line"
+  ph_col: "phenotype"
+  readout_col: "value"
+
+# === TRAINING MODE ===
+mode: "scratch"
+checkpoint_path: null
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "random"
+  val_fraction: 0.15
+  n_splits: 5
+  run_cv: false
+
+# === RANDOMIZATION ===
+random_seed: 42
+
+# === OUTPUT ===
+output_dir: "./single_intervention_models"
+
+# === MODEL CONFIGURATION ===
+# Training hyperparameters
+max_steps: 30000
+batch_size: 512
+early_stopping: true
+patience: 15
+pert_len: 1         # Only one intervention
+
+# Transformer configuration optimized for single interventions
+Transformer:
+  # Standard dimensions
+  dim_cl: 300
+  dim_iv: 500
+  dim_phe: 300
+  model_dim: 256
+  
+  # Architecture
+  num_heads: 8
+  num_layers: 4
+  simpler: true    # Simpler architecture since only 1 intervention
+  
+  # Training parameters
+  lr: 1e-4
+  weight_decay: 0.01
+  warmup: 3000
+  max_iters: 30000
+  
+  # Dropout
+  iv_dropout: 0.1
+  cl_dropout: 0.1
+  ph_dropout: 0.1
+  regressor_dropout: 0.1
+  dropout: 0.1
+  
+  # Settings
+  pool: cls
+  mask: true
+  sum: false
+  explicit_phenotype: false
+  linear_predictor: false
+  tokenizer_layers: 2

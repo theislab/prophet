@@ -1,0 +1,64 @@
+# === DATA CONFIGURATION ===
+data:
+  # Option A: Use predefined setting (recommended for known datasets)
+  setting: "pretrain"           # "SCORE", "pretrain", "Rad", "everything"
+  
+  # Option B: Custom dataset paths (overrides setting if provided)
+  data_path: null               # Set to null when using setting
+  iv_embeddings: null           # Set to null when using setting
+  cl_embeddings: null           # Set to null when using setting
+  ph_embeddings: null           # Set to null when using setting
+  
+  # Column specifications (always required)
+  iv_cols: ["iv1", "iv2"]
+  cl_col: "cell_line"
+  ph_col: "phenotype"
+  readout_col: "value"
+
+# === TRAINING MODE ===
+mode: "scratch"
+checkpoint_path: null
+
+# === SPLITTING STRATEGY ===
+splitting:
+  method: "leave_iv_out"
+  val_fraction: 0.15
+  n_splits: 5
+  run_cv: true
+
+# === RANDOMIZATION ===
+random_seed: 42
+
+# === OUTPUT ===
+output_dir: "./pretrain_models"
+
+# === MODEL CONFIGURATION ===
+max_steps: 100000
+batch_size: 512
+early_stopping: true
+patience: 20
+pert_len: 2
+
+Transformer:
+  dim_cl: 300
+  dim_iv: 500
+  dim_phe: 300
+  model_dim: 512
+  num_heads: 8
+  num_layers: 8
+  simpler: false
+  lr: 1e-4
+  weight_decay: 0.01
+  warmup: 5000
+  max_iters: 100000
+  iv_dropout: 0.1
+  cl_dropout: 0.1
+  ph_dropout: 0.1
+  regressor_dropout: 0.1
+  dropout: 0.1
+  pool: cls
+  mask: true
+  sum: false
+  explicit_phenotype: false
+  linear_predictor: false
+  tokenizer_layers: 2
