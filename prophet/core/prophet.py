@@ -12,6 +12,7 @@ from ..utils import R2ScoreCallback
 import functools
 from joblib import load
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 from ..data import (
     dataloader_phenotypes,
     process_priors,
@@ -411,24 +412,62 @@ class Prophet:
 
         # Data should already be clean and validated at this point
         df = df.rename(columns=self.column_map).copy()
-        val_df = val_df.rename(columns=self.column_map).copy()
+        
+        # Filter out rows with missing embeddings
+        original_len = len(df)
+        df = self._remove_nonexistent_cat(df, verbose=True)
+        if len(df) < original_len:
+            print(f"Filtered out {original_len - len(df)} rows with missing embeddings. {len(df)} rows remaining.")
+        
+        if val_df is not None:
+            val_df = val_df.rename(columns=self.column_map).copy()
+            # Filter validation data as well
+            original_val_len = len(val_df)
+            val_df = self._remove_nonexistent_cat(val_df, verbose=False)
+            if len(val_df) < original_val_len:
+                print(f"Filtered out {original_val_len - len(val_df)} validation rows with missing embeddings. {len(val_df)} rows remaining.")
 
         if test_df is not None:
             test_df = test_df.rename(columns=self.column_map).copy()
             test_df = test_df.reset_index(drop=True)
+            # Filter test data as well
+            original_test_len = len(test_df)
+            test_df = self._remove_nonexistent_cat(test_df, verbose=False)
+            if len(test_df) < original_test_len:
+                print(f"Filtered out {original_test_len - len(test_df)} test rows with missing embeddings. {len(test_df)} rows remaining.")
             test_indices = np.arange(
-                len(df) + len(val_df), len(df) + len(val_df) + len(test_df)
+                len(df) + (len(val_df) if val_df is not None else 0), #add fix when val_df is None
+                len(df) + (len(val_df) if val_df is not None else 0) + len(test_df)
             )
         else:
             test_df = pd.DataFrame()
             test_indices = []
 
         # Combine all data
-        combined_data = pd.concat([df, val_df, test_df], ignore_index=True)
+        data_to_combine = [df]
+        if val_df is not None:
+            data_to_combine.append(val_df)
+        if test_df is not None and len(test_df) > 0:
+            data_to_combine.append(test_df)
+        
+        combined_data = pd.concat(data_to_combine, ignore_index=True)
 
         # Create indices for the combined dataset
-        train_indices = np.arange(len(df))
-        valid_indices = np.arange(len(df), len(df) + len(val_df))
+        if val_df is not None:
+            # Use provided validation data
+            train_indices = np.arange(len(df))
+            valid_indices = np.arange(len(df), len(df) + len(val_df))
+        else:
+            # Automatically split training data 90/10 for training/validation
+            from sklearn.model_selection import train_test_split
+            train_idx, valid_idx = train_test_split(
+                np.arange(len(df)), 
+                test_size=0.1, 
+                random_state=42, 
+                shuffle=True
+            )
+            train_indices = train_idx
+            valid_indices = valid_idx
 
         print("Fitting model.")
         if not self.torch_dataset:
@@ -527,6 +566,8 @@ class Prophet:
                 monitor="R2_validation", mode="max", patience=10, min_delta=0.0
             )
 
+            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
+
             if wandb_config is None:
                 wandb_config = {}
 
@@ -553,8 +594,6 @@ class Prophet:
                 save_dir=default_wandb["save_dir"],
             )
 
-            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
-
             trainer = pl.Trainer(
                 min_epochs=1,
                 max_steps=model_config.max_steps,
@@ -576,7 +615,7 @@ class Prophet:
                 f"Dataset sizes:\n"
                 f"  Training:    {len(split[0].dataset.labels):,d} samples\n"
                 f"  Validation:  {len(split[1].dataset.labels):,d} samples\n"
-                f"  Test:        {len(split[2].dataset.labels):,d} samples"
+                f"  Test:        {len(split[2].dataset.labels) if split[2] is not None else 0:,d} samples"
             )
             trainer.fit(
                 model=model, train_dataloaders=split[0], val_dataloaders=split[1]
@@ -687,6 +726,20 @@ class Prophet:
         if self.column_map is not None:
             df = df.rename(columns=self.column_map).copy()
         df = df.reset_index(drop=True)
+
+        # Filter out rows with missing embeddings
+        original_len = len(df)
+        # Set column names for filtering in standard prediction format
+        if not hasattr(self, 'iv_cols') or self.iv_cols is None:
+            self.iv_cols = ["iv1", "iv2"] if "iv2" in df.columns else ["iv1"]
+        if not hasattr(self, 'cl_col') or self.cl_col is None:
+            self.cl_col = "cell_line"
+        if not hasattr(self, 'ph_col') or self.ph_col is None:
+            self.ph_col = "phenotype"
+        
+        df = self._remove_nonexistent_cat(df, verbose=True)
+        if len(df) < original_len:
+            print(f"Filtered out {original_len - len(df)} rows with missing embeddings. {len(df)} rows remaining.")
 
         # Add dummy value column for dataloader
         df["_"] = 0
