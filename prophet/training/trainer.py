@@ -495,24 +495,87 @@ class ProphetTrainer:
     ):
         """Train or fine-tune on a single split."""
 
-        # Normalize the readout column to prevent data leakage
+        # Normalize the readout column per phenotype to prevent data leakage
         readout_col = data_config["readout_col"]
-
-        # Fit scaler on training data only
-        scaler = MinMaxScaler()
+        phenotype_col = data_config["ph_col"]
 
         # Create copies to avoid modifying original data
         train_df_norm = train_df.copy()
         val_df_norm = val_df.copy()
         test_df_norm = test_df.copy()
 
-        # Fit on train, transform all
-        train_df_norm[readout_col] = scaler.fit_transform(train_df[[readout_col]])
-        val_df_norm[readout_col] = scaler.transform(val_df[[readout_col]])
-        test_df_norm[readout_col] = scaler.transform(test_df[[readout_col]])
+        # Store scalers per phenotype for later inverse transformation if needed
+        self.current_scalers = {}
 
-        # Store scaler for later inverse transformation if needed
-        self.current_scaler = scaler
+        # Get all phenotypes present in training data
+        train_phenotypes = train_df_norm[phenotype_col].unique()
+
+        print(
+            f"Applying per-phenotype MinMax scaling for {len(train_phenotypes)} phenotypes"
+        )
+
+        # Apply MinMax scaling per phenotype
+        for phenotype in train_phenotypes:
+            # Get training data for this phenotype to fit scaler
+            train_phe_mask = train_df_norm[phenotype_col] == phenotype
+
+            train_phe_values = train_df_norm.loc[
+                train_phe_mask, readout_col
+            ].values.reshape(-1, 1)
+
+            if len(train_phe_values) == 0:
+                continue
+
+            # Fit scaler on this phenotype's training data only
+            scaler = MinMaxScaler()
+            scaler.fit(train_phe_values)
+
+            # Transform training data for this phenotype
+            train_df_norm.loc[train_phe_mask, readout_col] = scaler.transform(
+                train_phe_values
+            ).flatten()
+
+            # Transform validation data for this phenotype (if present)
+            val_phe_mask = val_df_norm[phenotype_col] == phenotype
+            if val_phe_mask.any():
+                val_phe_values = val_df_norm.loc[
+                    val_phe_mask, readout_col
+                ].values.reshape(-1, 1)
+                val_df_norm.loc[val_phe_mask, readout_col] = scaler.transform(
+                    val_phe_values
+                ).flatten()
+
+            # Transform test data for this phenotype (if present)
+            test_phe_mask = test_df_norm[phenotype_col] == phenotype
+            if test_phe_mask.any():
+                test_phe_values = test_df_norm.loc[
+                    test_phe_mask, readout_col
+                ].values.reshape(-1, 1)
+                test_df_norm.loc[test_phe_mask, readout_col] = scaler.transform(
+                    test_phe_values
+                ).flatten()
+
+            # Print scaling info for this phenotype
+            original_min = train_phe_values.min()
+            original_max = train_phe_values.max()
+            print(
+                f"  {phenotype}: [{original_min:.3f}, {original_max:.3f}] -> [0.000, 1.000] ({len(train_phe_values)} train samples)"
+            )
+
+        # Handle phenotypes that appear in val/test but not in training
+        # These will use the scaler from the most similar phenotype or be left unscaled with a warning
+        all_phenotypes = (
+            set(train_df_norm[phenotype_col].unique())
+            | set(val_df_norm[phenotype_col].unique())
+            | set(test_df_norm[phenotype_col].unique())
+        )
+
+        missing_phenotypes = all_phenotypes - set(train_phenotypes)
+        if missing_phenotypes:
+            print(
+                f"⚠️  Warning: Phenotypes {missing_phenotypes} appear in val/test but not in training."
+            )
+            print(f"   These will not be scaled. Consider adjusting your data splits.")
 
         # Create Prophet instance with the pre-created config
         self.prophet_model = Prophet(
@@ -520,7 +583,7 @@ class ProphetTrainer:
             cl_emb_path=self.cl_emb_paths,
             ph_emb_path=self.ph_emb_paths,
             model_pth=checkpoint_path,
-            architecture="Transformer",
+            architecture=self.config.get("architecture", "Transformer"),
             config=prophet_config,
         )
 

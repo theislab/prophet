@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# PyTorch/ML models and logs
+*.pth
+*.pt
+*.ckpt
+lightning_logs/
+wandb/
+runs/
+wandb_logs/
+
+# SLURM job outputs
+*.out
+*.err
+err/
+
+# Large data files (uncomment if needed)
+# *.csv
+# *.pkl
+# *.npy
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints
+
+# Temporary files
+*.tmp
+temp/
+

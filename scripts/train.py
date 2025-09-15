@@ -8,6 +8,7 @@ Clean, research-focused training script using YAML configuration.
 import argparse
 from pathlib import Path
 import yaml
+import torch
 
 from prophet.training import ProphetTrainer, set_seeds
 
@@ -86,9 +87,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Print GPU information
-    import torch
-
     print("\nGPU Information:")
     if torch.cuda.is_available():
         gpu_count = torch.cuda.device_count()

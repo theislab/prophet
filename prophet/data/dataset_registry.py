@@ -114,13 +114,13 @@ class DatasetRegistry:
             },
             "everything": {
                 "data_paths": [
-                    f"{base_data_path}/SCORE_dataset.csv",
+                    # f"{base_data_path}/SCORE_dataset.csv",
                     f"{base_data_path}/GDSC_dataset.csv",
                     f"{base_data_path}/CTRP_dataset.csv",
-                    f"{base_data_path}/JUMP_dataset.csv",
-                    f"{base_data_path}/LINCS_dataset.csv",
-                    f"{base_data_path}/GDSCcomb_dataset.csv",
-                    f"{base_data_path}/PRISM_dataset.csv",
+                    # f"{base_data_path}/JUMP_dataset.csv",
+                    # f"{base_data_path}/LINCS_dataset.csv",
+                    # f"{base_data_path}/GDSCcomb_dataset.csv",
+                    # f"{base_data_path}/PRISM_dataset.csv",
                 ],
                 "iv_embeddings": [
                     f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv",

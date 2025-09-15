@@ -121,17 +121,31 @@ class Prophet:
 
         if model_pth and architecture == "RandomForest":
             self.model = load(model_pth)
-        else:
-            self.model_pth = model_pth
-            self.model = self._build_model(architecture)
-            self.phenotypes = self.model.hparams["phenotypes"]
+            # For loaded RandomForest, set attributes appropriately
+            self.phenotypes = None  # Will be set during training
             self.iv_embedding, self.cl_embedding, self.ph_embedding = process_priors(
                 self.iv_emb_path, self.cl_emb_path, self.ph_emb_path
             )
-            if self.model.hparams.explicit_phenotype and self.ph_embedding is None:
-                raise ValueError(
-                    "model was run with explicit phenotype! must pass a ph_emb_path"
+        else:
+            self.model_pth = model_pth
+            self.model = self._build_model(architecture)
+
+            if architecture == "RandomForest":
+                # RandomForest doesn't have hparams, handle differently
+                self.phenotypes = None  # Will be set during training
+                self.iv_embedding, self.cl_embedding, self.ph_embedding = (
+                    process_priors(self.iv_emb_path, self.cl_emb_path, self.ph_emb_path)
                 )
+            else:
+                # Transformer models have hparams
+                self.phenotypes = self.model.hparams["phenotypes"]
+                self.iv_embedding, self.cl_embedding, self.ph_embedding = (
+                    process_priors(self.iv_emb_path, self.cl_emb_path, self.ph_emb_path)
+                )
+                if self.model.hparams.explicit_phenotype and self.ph_embedding is None:
+                    raise ValueError(
+                        "model was run with explicit phenotype! must pass a ph_emb_path"
+                    )
 
     @classmethod
     def from_pretrained(
