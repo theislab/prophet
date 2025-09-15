@@ -41,25 +41,6 @@ class DatasetRegistry:
                 ],
                 "ph_embeddings": None,
             },
-            "everything": {
-                "data_paths": [
-                    f"{base_data_path}/SCORE_dataset.csv",
-                    f"{base_data_path}/GDSC_dataset.csv",
-                    f"{base_data_path}/CTRP_dataset.csv",
-                    f"{base_data_path}/JUMP_dataset.csv",
-                    f"{base_data_path}/LINCS_dataset.csv",
-                    f"{base_data_path}/GDSCcomb_dataset.csv",
-                    f"{base_data_path}/PRISM_dataset.csv",
-                ],
-                "iv_embeddings": [
-                    f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv",
-                    f"{base_emb_path}/intervention_embeddings/CTRP_with_smiles_simscaled.csv",
-                ],
-                "cl_embeddings": [
-                    f"{base_emb_path}/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
-                ],
-                "ph_embeddings": None,
-            },
             "GDSC": {
                 "data_paths": [f"{base_data_path}/GDSC_dataset.csv"],
                 "iv_embeddings": [
@@ -72,6 +53,75 @@ class DatasetRegistry:
             },
             "CTRP": {
                 "data_paths": [f"{base_data_path}/CTRP_dataset.csv"],
+                "iv_embeddings": [
+                    f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv",
+                    f"{base_emb_path}/intervention_embeddings/CTRP_with_smiles_simscaled.csv",
+                ],
+                "cl_embeddings": [
+                    f"{base_emb_path}/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
+                ],
+                "ph_embeddings": None,
+            },
+            "JUMP": {
+                "data_paths": [f"{base_data_path}/JUMP_dataset.csv"],
+                "iv_embeddings": [
+                    f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv"
+                ],
+                "cl_embeddings": [
+                    f"{base_emb_path}/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
+                ],
+                "ph_embeddings": None,
+            },
+            "LINCS": {
+                "data_paths": [f"{base_data_path}/LINCS_dataset.csv"],
+                "iv_embeddings": [
+                    f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv"
+                ],
+                "cl_embeddings": [
+                    f"{base_emb_path}/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
+                ],
+                "ph_embeddings": None,
+            },
+            "GDSCcomb": {
+                "data_paths": [f"{base_data_path}/GDSCcomb_dataset.csv"],
+                "iv_embeddings": [
+                    f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv"
+                ],
+                "cl_embeddings": [
+                    f"{base_emb_path}/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
+                ],
+                "ph_embeddings": None,
+            },
+            "PRISM": {
+                "data_paths": [f"{base_data_path}/PRISM_dataset.csv"],
+                "iv_embeddings": [
+                    f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv"
+                ],
+                "cl_embeddings": [
+                    f"{base_emb_path}/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
+                ],
+                "ph_embeddings": None,
+            },
+            "Shifru": {
+                "data_paths": [f"{base_data_path}/Shifru_dataset.csv"],
+                "iv_embeddings": [
+                    f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv"
+                ],
+                "cl_embeddings": [
+                    f"{base_emb_path}/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv"
+                ],
+                "ph_embeddings": None,
+            },
+            "everything": {
+                "data_paths": [
+                    f"{base_data_path}/SCORE_dataset.csv",
+                    f"{base_data_path}/GDSC_dataset.csv",
+                    f"{base_data_path}/CTRP_dataset.csv",
+                    f"{base_data_path}/JUMP_dataset.csv",
+                    f"{base_data_path}/LINCS_dataset.csv",
+                    f"{base_data_path}/GDSCcomb_dataset.csv",
+                    f"{base_data_path}/PRISM_dataset.csv",
+                ],
                 "iv_embeddings": [
                     f"{base_emb_path}/intervention_embeddings/global_iv_scaledv3.csv",
                     f"{base_emb_path}/intervention_embeddings/CTRP_with_smiles_simscaled.csv",
