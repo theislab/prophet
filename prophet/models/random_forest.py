@@ -3,8 +3,6 @@ Random Forest model implementation for Prophet.
 """
 
 from sklearn.ensemble import RandomForestRegressor
-import numpy as np
-
 
 class RandomForestPredictor(RandomForestRegressor):
     """
