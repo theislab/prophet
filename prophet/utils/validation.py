@@ -485,9 +485,13 @@ def validate_prophet_inputs(
     Raises:
         ValidationError: If validation fails.
     """
+    print("Starting input validation...")
     results = {"status": "success", "warnings": [], "processed_inputs": {}}
 
     # Validate embedding files
+    if iv_emb_path or cl_emb_path or ph_emb_path:
+        print("Validating embedding files...")
+
     if iv_emb_path:
         iv_paths = EmbeddingValidator.validate_embedding_files(iv_emb_path)
         results["processed_inputs"]["iv_emb_path"] = iv_paths
@@ -502,6 +506,10 @@ def validate_prophet_inputs(
 
     # Validate DataFrame if provided
     if df is not None:
+        print(
+            f"Processing DataFrame with {df.shape[0]} rows and {df.shape[1]} columns..."
+        )
+
         required_cols = []
         if iv_col:
             if isinstance(iv_col, str):
@@ -515,6 +523,7 @@ def validate_prophet_inputs(
         if readout_col and mode == "train":
             required_cols.append(readout_col)
 
+        print("Validating DataFrame structure and columns...")
         DataFrameValidator.validate_columns(df, required_cols)
 
         # Validate data types
@@ -526,6 +535,7 @@ def validate_prophet_inputs(
         results["processed_inputs"]["df"] = df_validated
 
         # Check for missing values in critical columns
+        print("Checking for missing values...")
         critical_cols = [col for col in required_cols if col != readout_col]
         df_validated = DataFrameValidator.validate_no_missing_values(
             df_validated, critical_cols, action="warn"
@@ -538,14 +548,18 @@ def validate_prophet_inputs(
             )
 
         # Convert strings to lowercase efficiently
+        print("Converting text to lowercase...")
         df_validated = _convert_strings_to_lowercase(df_validated, cl_col)
 
         # Process priors
+        print("Loading embedding files...")
         iv_embedding, cl_embedding, ph_embedding = process_priors(
             iv_emb_path, cl_emb_path, ph_emb_path
         )
 
         # Remove nonexistent categories in one efficient pass
+        print("Filtering data to match available embeddings...")
+        initial_rows = df_validated.shape[0]
         df_validated = _remove_nonexistent_categories(
             df_validated,
             iv_embedding,
@@ -555,9 +569,15 @@ def validate_prophet_inputs(
             cl_col,
             ph_col,
         )
+        final_rows = df_validated.shape[0]
+        if final_rows < initial_rows:
+            print(
+                f"Filtered {initial_rows - final_rows} rows with missing embeddings ({final_rows} rows remaining)"
+            )
 
         # Single reset_index at the end
         df_validated = df_validated.reset_index(drop=True)
         results["processed_inputs"]["df"] = df_validated
 
+    print("Input validation completed successfully")
     return results

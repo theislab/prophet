@@ -6,6 +6,7 @@ import pandas as pd
 from functools import reduce
 import os
 from .dataset import PhenotypeDataset
+from tqdm import tqdm
 
 
 SEED = 42  # the true, baseline seed (that sets test splits)
@@ -67,69 +68,79 @@ def dataloader_phenotypes(
         ce = cell_lines_embedding.dropna()
         ge = ge.drop(columns=["type"])
 
+        n_samples = len(data_label)
+
         if phenotype_embedding is not None:
             pe = phenotype_embedding.dropna()
-            X_phenotype = pe.loc[data_label.phenotype].to_numpy()
+            phenotype_dim = pe.shape[1]
         else:
-            X_phenotype = (
-                pd.get_dummies(data_label["phenotype"]).astype(float).values
-            )  # 1he
-        X_iv = np.concatenate(
-            [ge.loc[data_label[f"iv{i}"]].to_numpy() for i in range(1, pert_len + 1)],
-            axis=1,
-        )
-        X_cellline = ce.loc[data_label.cell_line].to_numpy()
+            phenotype_dim = len(data_label["phenotype"].unique())
+
+        cellline_dim = ce.shape[1]
+        iv_dim = ge.shape[1] * pert_len
+        total_dim = phenotype_dim + cellline_dim + iv_dim
+
+        X_full = np.empty((n_samples, total_dim), dtype=np.float32)
+
+        if phenotype_embedding is not None:
+            with tqdm(total=n_samples, desc="Phenotype lookup", unit="samples") as pbar:
+                X_full[:, :phenotype_dim] = pe.loc[data_label.phenotype].to_numpy()
+                pbar.update(n_samples)
+        else:
+            with tqdm(desc="One-hot encoding phenotypes", unit="operation") as pbar:
+                X_full[:, :phenotype_dim] = (
+                    pd.get_dummies(data_label["phenotype"]).astype(np.float32).values
+                )
+                pbar.update(1)
+
+        with tqdm(total=n_samples, desc="Cell line lookup", unit="samples") as pbar:
+            X_full[:, phenotype_dim : phenotype_dim + cellline_dim] = ce.loc[
+                data_label.cell_line
+            ].to_numpy()
+            pbar.update(n_samples)
+
+        start_idx = phenotype_dim + cellline_dim
+        for i in tqdm(
+            range(1, pert_len + 1), desc="Processing perturbations", unit="perturbation"
+        ):
+            end_idx = start_idx + ge.shape[1]
+            with tqdm(
+                total=n_samples, desc=f"IV{i} lookup", unit="samples", leave=False
+            ) as pbar:
+                X_full[:, start_idx:end_idx] = ge.loc[data_label[f"iv{i}"]].to_numpy()
+                pbar.update(n_samples)
+            start_idx = end_idx
+
         if label_name is None:
             return [
-                (
-                    np.concatenate(
-                        [X_phenotype[idxs], X_cellline[idxs], X_iv[idxs]], axis=1
-                    ),
-                    None,
-                )
+                (X_full[idxs], None)
                 for idxs in [train_indices, valid_indices, test_indices]
             ]
         else:
             y_label = data_label[label_name].to_numpy()
-
             return [
-                (
-                    np.concatenate(
-                        [X_phenotype[idxs], X_cellline[idxs], X_iv[idxs]], axis=1
-                    ),
-                    y_label[idxs],
-                )
+                (X_full[idxs], y_label[idxs])
                 for idxs in [train_indices, valid_indices, test_indices]
             ]
 
     data = data_label.copy()
 
-    # Use concatenated embeddings if provided as lists
-    gene_embedding = (
-        pd.concat(gene_embedding)
-        if isinstance(gene_embedding, list)
-        else gene_embedding
-    )
-    cell_lines_embedding = (
-        pd.concat(cell_lines_embedding)
-        if isinstance(cell_lines_embedding, list)
-        else cell_lines_embedding
-    )
-    phenotype_embedding = (
-        pd.concat(phenotype_embedding)
-        if isinstance(phenotype_embedding, list) and phenotype_embedding[0] is not None
-        else (
-            phenotype_embedding[0]
-            if isinstance(phenotype_embedding, list)
-            else phenotype_embedding
-        )
-    )
+    with tqdm(desc="Concatenating gene embeddings", unit="operation") as pbar:
+        gene_embedding = _efficient_concat_embeddings(gene_embedding)
+        pbar.update(1)
+
+    with tqdm(desc="Concatenating cell line embeddings", unit="operation") as pbar:
+        cell_lines_embedding = _efficient_concat_embeddings(cell_lines_embedding)
+        pbar.update(1)
+
+    with tqdm(desc="Concatenating phenotype embeddings", unit="operation") as pbar:
+        phenotype_embedding = _efficient_concat_embeddings(phenotype_embedding)
+        pbar.update(1)
 
     if phenotypes is None:
         phenotypes = sorted(data_label["phenotype"].unique())
 
     optimal_workers = min(8, os.cpu_count())
-
     prefetch_factor = max(4, min(16, 8192 // batch_size))
 
     test_dict = None
@@ -282,6 +293,52 @@ def dataloader_phenotypes(
             test_indices,
             cl_holdout,
         )
+
+
+def _efficient_concat_embeddings(embeddings):
+    """Efficiently concatenate embeddings with minimal memory copying"""
+    if not isinstance(embeddings, list):
+        return embeddings
+
+    if len(embeddings) == 1:
+        return embeddings[0]
+
+    # Check if all embeddings have the same columns
+    if all(
+        emb is not None and emb.columns.equals(embeddings[0].columns)
+        for emb in embeddings
+    ):
+        # Fast path: use numpy vstack on values then reconstruct DataFrame
+        indices = []
+        values_list = []
+
+        with tqdm(embeddings, desc="Processing embeddings", unit="dataframe") as pbar:
+            for emb in pbar:
+                if emb is not None:
+                    indices.extend(emb.index)
+                    values_list.append(emb.values)
+
+        if values_list:
+            with tqdm(desc="Vertical stacking arrays", unit="operation") as pbar:
+                combined_values = np.vstack(values_list)
+                pbar.update(1)
+
+            with tqdm(desc="Creating DataFrame", unit="operation") as pbar:
+                result = pd.DataFrame(
+                    combined_values, index=indices, columns=embeddings[0].columns
+                )
+                pbar.update(1)
+
+            return result
+
+    valid_embeddings = [emb for emb in embeddings if emb is not None]
+    if valid_embeddings:
+        with tqdm(desc="Pandas concatenation", unit="operation") as pbar:
+            result = pd.concat(valid_embeddings)
+            pbar.update(1)
+        return result
+
+    return embeddings[0] if embeddings else None
 
 
 def read_in_priors(prior_files):

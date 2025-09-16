@@ -86,9 +86,7 @@ class ProphetTrainer:
 
             # Subsample SCORE dataset to 33% if it's being loaded
             if "SCORE_dataset.csv" in path:
-                print(f"Original SCORE dataset size: {len(df)}")
                 df = df.sample(frac=0.33, random_state=self.seed).reset_index(drop=True)
-                print(f"Subsampled SCORE dataset size: {len(df)} (33%)")
 
             datasets.append(df)
 
@@ -285,10 +283,10 @@ class ProphetTrainer:
             checkpoint_path = self.config.get("checkpoint_path")
 
             if checkpoint_path:
-                print(f"🔄 FINETUNING MODE: Looking for existing split assignments...")
+                print(f"FINETUNING MODE: Looking for existing split assignments...")
                 split_assignments = self.load_split_assignments(checkpoint_path)
             else:
-                print(f"🆕 TRAINING FROM SCRATCH: Will create new split assignments...")
+                print(f"TRAINING FROM SCRATCH: Will create new split assignments...")
                 split_assignments = None
 
             # If no existing splits found, create new ones
@@ -298,7 +296,7 @@ class ProphetTrainer:
                 )
                 self.split_assignments = split_assignments  # Store for later saving
             else:
-                print(f"✅ Using existing split assignments from pretrained model")
+                print(f"Using existing split assignments from pretrained model")
                 self.split_assignments = split_assignments
 
             # Apply split assignments to current dataset
@@ -369,47 +367,6 @@ class ProphetTrainer:
                 splits.append((train_df, val_df, test_df, descriptor))
         else:
             raise ValueError(f"Unknown splitting method: {method}")
-
-        if splits and hasattr(self, "split_assignments") and self.split_assignments:
-            train_df, val_df, test_df, descriptor = splits[0]  # Just check first split
-            iv_cols = data_config["iv_cols"]
-
-            # Use the actual split assignments that were used
-            fold_0_assignments = self.split_assignments[0]
-            assigned_train = fold_0_assignments["train"]
-            assigned_val = fold_0_assignments["val"]
-            assigned_test = fold_0_assignments["test"]
-
-            # Get what's actually present in the data
-            actual_train_interventions = set()
-            actual_val_interventions = set()
-            actual_test_interventions = set()
-
-            for col in iv_cols:
-                if col in train_df.columns:
-                    actual_train_interventions.update(train_df[col].dropna().unique())
-                if col in val_df.columns:
-                    actual_val_interventions.update(val_df[col].dropna().unique())
-                if col in test_df.columns:
-                    actual_test_interventions.update(test_df[col].dropna().unique())
-
-            val_only = actual_val_interventions - actual_train_interventions
-            test_only = actual_test_interventions - actual_train_interventions
-
-            print(f"\n🔍 DEBUG - Condition differences for {descriptor}:")
-            print(
-                f"  ASSIGNED: Train: {len(assigned_train)}, Val: {len(assigned_val)}, Test: {len(assigned_test)}"
-            )
-            print(
-                f"  ACTUAL: Train: {len(actual_train_interventions)}, Val: {len(actual_val_interventions)}, Test: {len(actual_test_interventions)}"
-            )
-            print(
-                f"  Validation-only conditions: {len(val_only)} (examples: {sorted(list(val_only))[:5]})"
-            )
-            print(
-                f"  Test-only conditions: {len(test_only)} (examples: {sorted(list(test_only))[:5]})"
-            )
-            print()
 
         return splits
 

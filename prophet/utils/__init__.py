@@ -32,7 +32,7 @@ from .model_hub import (
     check_model_availability,
 )
 
-from .callbacks import R2ScoreCallback, CosineWarmupScheduler
+from .callbacks import R2ScoreCallback, CosineWarmupScheduler, HitRatioCallback
 
 __all__ = [
     # Validation
@@ -55,4 +55,5 @@ __all__ = [
     "check_model_availability",
     "R2ScoreCallback",
     "CosineWarmupScheduler",
+    "HitRatioCallback",
 ]

@@ -4,6 +4,7 @@ from pytorch_lightning.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
     LearningRateMonitor,
+    HitRatioCallback,
 )
 import numpy as np
 import pandas as pd
@@ -11,7 +12,6 @@ from typing import List, Union, Optional, Dict
 from ..utils import R2ScoreCallback
 import functools
 from joblib import load
-from sklearn.ensemble import RandomForestRegressor
 from ..data import (
     dataloader_phenotypes,
     process_priors,
@@ -238,10 +238,23 @@ class Prophet:
         """
         return list_available_models()
 
-    def _build_model(self, arch):
+    def _build_model(self, arch, model_config=None):
         if arch == "RandomForest":
             self.torch_dataset = False
-            return RandomForestRegressor()
+            from ..models.random_forest import RandomForestPredictor
+
+            # Extract RandomForest-specific config if provided
+            rf_config = {}
+            if model_config and hasattr(model_config, "RandomForest"):
+                rf_config = model_config.RandomForest
+            elif (
+                model_config
+                and isinstance(model_config, dict)
+                and "RandomForest" in model_config
+            ):
+                rf_config = model_config["RandomForest"]
+
+            return RandomForestPredictor(**rf_config)
         elif arch == "Transformer":
             self.torch_dataset = True
 
@@ -447,6 +460,10 @@ class Prophet:
         print("Fitting model.")
         if not self.torch_dataset:
             # For non-PyTorch models (like RandomForest)
+            # Rebuild model with config if provided
+            if model_config is not None:
+                self.model = self._build_model("RandomForest", model_config)
+
             unbalanced = (
                 getattr(model_config, "unbalanced", False) if model_config else False
             )
@@ -469,8 +486,131 @@ class Prophet:
                 unbalanced=unbalanced,
             )
             print(f"Using unbalanced sampling: {unbalanced}")
-            X_train, y_train = split[0]  # This gets the training data
+            X_train, y_train = split[0]
+            X_test, y_test = split[2] if len(test_indices) > 0 else (None, None)
+
+            # Initialize WandB logging if config provided
+            logger = None
+            if wandb_config is not None:
+                if wandb_config == {}:
+                    wandb_config = {}
+
+                # Default WandB settings
+                default_wandb = {
+                    "project": "prophet",
+                    "entity": None,
+                    "name": "prophet-randomforest-training",
+                    "tags": ["RandomForest"],
+                    "notes": "Random Forest training with Prophet",
+                    "save_dir": "./wandb",
+                }
+
+                # Update with provided config
+                default_wandb.update(wandb_config)
+
+                # Create WandB logger
+                logger = WandbLogger(
+                    project=default_wandb["project"],
+                    entity=default_wandb["entity"],
+                    name=default_wandb["name"],
+                    tags=default_wandb["tags"],
+                    notes=default_wandb["notes"],
+                    save_dir=default_wandb["save_dir"],
+                )
+
+                # Log model config
+                logger.experiment.config.update(
+                    {
+                        "architecture": "RandomForest",
+                        "n_estimators": getattr(self.model, "n_estimators", 100),
+                        "max_depth": getattr(self.model, "max_depth", None),
+                        "min_samples_split": getattr(
+                            self.model, "min_samples_split", 2
+                        ),
+                        "min_samples_leaf": getattr(self.model, "min_samples_leaf", 1),
+                        "bootstrap": getattr(self.model, "bootstrap", True),
+                        "n_features": X_train.shape[1],
+                        "n_train_samples": X_train.shape[0],
+                        "n_test_samples": X_test.shape[0] if X_test is not None else 0,
+                        "unbalanced_sampling": unbalanced,
+                        "pert_len": len(self.iv_cols),
+                    }
+                )
+
+            # Train the model
+            print(
+                f"🌲 Training RandomForest with {X_train.shape[0]:,} samples and {X_train.shape[1]:,} features"
+            )
             self.model.fit(X_train, y_train)
+
+            # Evaluate on test set if available
+            if X_test is not None and len(X_test) > 0:
+                print("🔮 Evaluating RandomForest on test set...")
+                y_pred = self.model.predict(X_test)
+
+                # Compute basic metrics
+                from sklearn.metrics import r2_score
+                from scipy.stats import spearmanr
+                from ..utils.callbacks import compute_hit_ratio
+
+                r2_test = r2_score(y_test, y_pred)
+                spearman_test = spearmanr(y_pred, y_test).statistic
+
+                print(f"✅ Test R² Score: {r2_test:.4f}")
+                print(f"✅ Test Spearman Correlation: {spearman_test:.4f}")
+
+                # Prepare data for HitRatio computation
+                test_data = combined_data.iloc[test_indices].copy()
+
+                # Extract cell lines, interventions, and phenotypes
+                cl_names = test_data["cell_line"].tolist()
+                iv_combinations = []
+                for idx in test_data.index:
+                    iv_combo = tuple(test_data.loc[idx, col] for col in self.iv_cols)
+                    iv_combinations.append(iv_combo)
+
+                phenotypes = test_data["phenotype"].values
+
+                # Compute HitRatio metrics
+                topk_values = (
+                    [5, 10]
+                    if model_config is None
+                    else getattr(model_config, "topk", [5, 10])
+                )
+                hitratio_metrics = compute_hit_ratio(
+                    predictions=y_pred,
+                    targets=y_test,
+                    cl=cl_names,
+                    phenotypes=phenotypes,
+                    iv=iv_combinations,
+                    topk=topk_values,
+                    suffix="_test",
+                )
+
+                # Print HitRatio results
+                for metric_name, value in hitratio_metrics.items():
+                    if "precision_both" in metric_name:
+                        print(f"✅ {metric_name}: {value:.4f}")
+
+                # Log all metrics to WandB if logger available
+                if logger is not None:
+                    logger.experiment.log(
+                        {
+                            "R2_test": r2_test,
+                            "Spearman_test": spearman_test,
+                            **hitratio_metrics,
+                            "n_test_samples": len(y_test),
+                            "n_features": X_train.shape[1],
+                        }
+                    )
+
+                    # Finish WandB run
+                    logger.experiment.finish()
+                    print("📊 Metrics logged to WandB!")
+            else:
+                print("⚠️  No test set available for evaluation")
+                if logger is not None:
+                    logger.experiment.finish()
         else:
             # Create dataloader with test setj
             unbalanced = (
@@ -536,6 +676,7 @@ class Prophet:
                 getattr(model_config, "r2_average", False) if model_config else False
             )
             r2_callback = R2ScoreCallback(device=model.device, average=r2_average)
+            hitratio_callback = HitRatioCallback(device=model.device, topk=[5, 10])
             print(f"R2 average: {r2_average}")
             early_stopping = EarlyStopping(
                 monitor="R2_validation", mode="max", patience=10, min_delta=0.0
@@ -567,7 +708,13 @@ class Prophet:
                 save_dir=default_wandb["save_dir"],
             )
 
-            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
+            callbacks = [
+                r2_callback,
+                hitratio_callback,
+                model_checkpointer,
+                lr_monitor,
+                early_stopping,
+            ]
 
             trainer = pl.Trainer(
                 min_epochs=1,
@@ -611,7 +758,7 @@ class Prophet:
                 test_results = trainer.test(
                     model, split[2]
                 )  # split[2] is already test dataloader
-                print(f"✅ Test set evaluation completed!")
+                print("✅ Test set evaluation completed!")
                 print(f"   Test metrics: {test_results}")
 
     def _generate_predict_df(
