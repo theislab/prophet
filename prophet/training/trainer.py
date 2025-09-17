@@ -98,7 +98,7 @@ class ProphetTrainer:
 
             # Subsample SCORE dataset to 33% if it's being loaded
             if "SCORE_dataset.csv" in path:
-                df = df.sample(frac=0.33, random_state=self.seed).reset_index(drop=True)
+                df = df.sample(frac=0.33, replace=False,random_state=42).reset_index(drop=True)
 
             datasets.append(df)
 
@@ -465,7 +465,7 @@ class ProphetTrainer:
             """Leaves out 20% of the tissue types in CCLE at a time, based on frequency of occurrence,
             unless there are 3 or fewer cell lines. Validation split is still unseen cell line so that
             we don't change the training procedure."""
-            ccle = pd.read_csv('/ictstr01/home/icb/yuge.ji/projects/i-need-an-intervention/datasets/CCLE/sample_info.csv', index_col=0)
+            ccle = pd.read_csv('../info_files/sample_info.csv', index_col=0)
             ccle.stripped_cell_line_name = ccle.stripped_cell_line_name.str.upper()
             tissue_dict = ccle.groupby('lineage')['stripped_cell_line_name'].apply(list).to_dict()
 
@@ -485,7 +485,7 @@ class ProphetTrainer:
         elif leaveout_method == 'leave_cl_cluster_out':
             """Leaves out 20% of the cell line clusters in CCLE at a time. Leiden was run with scanpy default parameters
             and are generally more coarse than tissue labels."""
-            ccle_obs = pd.read_csv('/ictstr01/home/icb/yuge.ji/projects/super_rad_project/embeddings_cl/sample_info_leiden.csv', index_col=0)
+            ccle_obs = pd.read_csv('../info_files/sample_info_leiden.csv', index_col=0)
             leiden_dict = ccle_obs.groupby('leiden')['stripped_cell_line_name'].apply(list).to_dict()
             n_splits = 5
             kf = KFold(n_splits=n_splits, shuffle=True, random_state=SEED)
@@ -530,7 +530,7 @@ class ProphetTrainer:
         
         elif leaveout_method == "leave_scaffold_out":
             """Leaves out (20% of) chemical scaffolds as in https://tdcommons.ai/functions/data_split#scaffold-split"""
-            smiles_obs = pd.read_csv('/ictstr01/home/icb/yuge.ji/projects/super_rad_project/embeddings_iv/iv_info.csv', index_col=0)
+            smiles_obs = pd.read_csv('../info_files/iv_info.csv', index_col=0)
             smiles_obs.smiles = smiles_obs.smiles.str.lower()
             scaffold_vc = smiles_obs.scaffold.value_counts()
             scaffold_dict = smiles_obs.groupby('scaffold')['smiles'].apply(list).to_dict()
@@ -550,7 +550,7 @@ class ProphetTrainer:
         
         elif leaveout_method == "leave_drug_cluster_out":
             """Leaves out (20% of) drug clusters similar to leave_cl_cluster_out."""
-            smiles_obs = pd.read_csv('/ictstr01/home/icb/yuge.ji/projects/super_rad_project/embeddings_iv/iv_info.csv', index_col=0)
+            smiles_obs = pd.read_csv('../info_files/iv_info.csv', index_col=0)
             smiles_obs.smiles = smiles_obs.smiles.str.lower()
             leiden_vc = smiles_obs.leiden.value_counts()
             leiden_dict = smiles_obs.groupby('leiden')['smiles'].apply(list).to_dict()
@@ -571,7 +571,7 @@ class ProphetTrainer:
 
         elif leaveout_method == "leave_iv_cluster_out":
             """Leaves out (20% of) iv clusters similar to leave_cl_cluster_out."""
-            iv_obs = pd.read_csv('/ictstr01/home/icb/yuge.ji/projects/super_rad_project/embeddings_iv/iv_info.csv', index_col=0)
+            iv_obs = pd.read_csv('../info_files/iv_info.csv', index_col=0)
             iv_obs.iv1 = iv_obs.iv1.str.lower()
             leiden_vc = iv_obs.leiden.value_counts()
             leiden_dict = iv_obs.groupby('leiden')['iv1'].apply(list).to_dict()
