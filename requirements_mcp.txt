@@ -1,0 +1,23 @@
+# Prophet MCP Server Requirements
+
+# Core MCP dependencies
+mcp>=0.4.0
+
+# Prophet dependencies (adjust versions as needed)
+torch>=1.9.0
+pytorch-lightning>=1.9.0
+scikit-learn>=1.0.0
+pandas>=1.3.0
+numpy>=1.21.0
+scipy>=1.7.0
+tqdm>=4.62.0
+joblib>=1.1.0
+
+# Additional dependencies for Prophet
+pyyaml>=6.0
+huggingface-hub>=0.16.0
+
+# Optional: for enhanced functionality
+matplotlib>=3.5.0
+seaborn>=0.11.0
+plotly>=5.0.0

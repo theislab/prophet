@@ -20,8 +20,6 @@ checkpoint_path: null
 # === SPLITTING STRATEGY ===
 splitting:
   method: "leave_iv_out"         # Leave interventions out
-  val_fraction: 0.15
-  n_splits: 5                    # 5-fold cross-validation
   run_cv: true                   # Run full cross-validation
 
 # === RANDOMIZATION ===

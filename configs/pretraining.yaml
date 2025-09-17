@@ -4,7 +4,7 @@
 # === DATA CONFIGURATION ===
 data:
   # Use predefined setting from registry
-  setting: "GDSC"
+  setting: "everything"
   
   # Column specifications (always required)
   iv_cols: ["iv1", "iv2"]
@@ -13,7 +13,7 @@ data:
   readout_col: "value"
 
 
-output_dir: "/lustre/groups/ml01/projects/super_rad_project/checkpoints_yuge"
+output_dir: "/lustre/groups/ml01/projects/super_rad_project/checkpoints_yuge2"
 
 # === TRAINING MODE ===
 mode: "scratch"
@@ -22,8 +22,6 @@ checkpoint_path: null
 # === SPLITTING STRATEGY ===
 splitting:
   method: "leave_iv_out"
-  val_fraction: 0.10
-  n_splits: 5
   run_cv: true
 
 # === RANDOMIZATION ===
@@ -31,9 +29,9 @@ random_seed: 2024
 
 # === WANDB CONFIGURATION ===
 wandb:
-  project: "Prophet_GDSC_training_yugetest"      # Your project name
-  entity: "phenopred"                # Your WandB username/team
-  save_dir: "./wandb_logs"              # Local save directory
+  project: "Prophet_GDSC_training_yugetest2"
+  entity: "phenopred"
+  save_dir: "./wandb_logs"
 
 # === MODEL CONFIGURATION ===
 # General training settings

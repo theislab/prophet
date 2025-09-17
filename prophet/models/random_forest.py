@@ -4,6 +4,7 @@ Random Forest model implementation for Prophet.
 
 from sklearn.ensemble import RandomForestRegressor
 
+
 class RandomForestPredictor(RandomForestRegressor):
     """
     Random Forest predictor for Prophet.

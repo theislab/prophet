@@ -1,3 +1,0 @@
-"""
-Model architecture configuration files.
-"""

@@ -20,8 +20,11 @@ from ..data import (
 from ..models import load_models_config, TransformerPredictor
 from ..utils import (
     download_model_files,
+    download_custom_model,
     list_available_models,
     print_available_models,
+    get_available_datasets,
+    get_available_splits,
 )
 from pytorch_lightning.loggers import WandbLogger
 import torch.optim as optim
@@ -212,6 +215,110 @@ class Prophet:
             print_available_models()
             raise
 
+    @classmethod
+    def from_dataset(
+        cls,
+        dataset: str,
+        split: str = "leave_cl_out",
+        seed: int = 42,
+        fold: int = 0,
+        unbalanced: bool = False,
+        cache_dir: Optional[str] = None,
+        force_download: bool = False,
+        **kwargs,
+    ) -> "Prophet":
+        """Load a Prophet model trained on a specific dataset with custom parameters.
+
+        This method allows you to load models with specific training configurations
+        from the structured HuggingFace repository (theislab/Prophet/dataset/split/seed/fold).
+
+        Args:
+            dataset: Dataset name (e.g., "GDSC", "CTRP", "LINCS", "JUMP", "SCORE", "Horlbeck", "GDSCcomb").
+                Use Prophet.available_datasets() to see all options.
+            split: Split method used during training (e.g., "leave_cl_out", "leave_iv_out").
+                Use Prophet.available_splits() to see all options.
+            seed: Random seed used during training (default: 42).
+            fold: Cross-validation fold number (default: 0).
+            unbalanced: Whether the model used unbalanced sampling during training (default: False).
+            cache_dir: Directory to cache downloaded files. If None, uses default cache.
+            force_download: Whether to force re-download even if files exist.
+            **kwargs: Additional arguments passed to Prophet constructor.
+
+        Returns:
+            Prophet model ready for inference or fine-tuning.
+
+        Raises:
+            ValueError: If dataset or split is not available.
+            ConnectionError: If download fails.
+
+        Examples:
+            Load GDSC model with default parameters:
+            >>> model = Prophet.from_dataset("GDSC")
+
+            Load CTRP model with specific split and seed:
+            >>> model = Prophet.from_dataset(
+            ...     dataset="CTRP",
+            ...     split="leave_iv_out",
+            ...     seed=123,
+            ...     fold=2
+            ... )
+
+            Load model trained with unbalanced sampling:
+            >>> model = Prophet.from_dataset(
+            ...     dataset="LINCS",
+            ...     unbalanced=True
+            ... )
+
+            See available datasets and splits:
+            >>> Prophet.available_datasets()
+            >>> Prophet.available_splits()
+        """
+        # Validate inputs
+        available_datasets = get_available_datasets()
+        if dataset not in available_datasets:
+            raise ValueError(
+                f"Dataset '{dataset}' not available. Available datasets: {available_datasets}"
+            )
+
+        available_splits = get_available_splits()
+        if split not in available_splits:
+            raise ValueError(
+                f"Split '{split}' not available. Available splits: {available_splits}"
+            )
+
+        print(
+            f"🔄 Downloading Prophet model: {dataset}/{split}/seed{seed}/fold{fold} from HuggingFace Hub..."
+        )
+
+        try:
+            # Download model and embedding files with custom parameters
+            model_path, gene_emb_path, cell_emb_path, phenotype_emb_path = (
+                download_custom_model(
+                    dataset=dataset,
+                    split=split,
+                    seed=seed,
+                    fold=fold,
+                    unbalanced=unbalanced,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                )
+            )
+
+            # Initialize Prophet with downloaded files
+            return cls(
+                iv_emb_path=gene_emb_path,
+                cl_emb_path=cell_emb_path,
+                ph_emb_path=phenotype_emb_path,
+                model_pth=model_path,
+                **kwargs,
+            )
+
+        except Exception as e:
+            print(f"❌ Failed to load model from {dataset}: {str(e)}")
+            print(f"\nAvailable datasets: {available_datasets}")
+            print(f"Available splits: {available_splits}")
+            raise
+
     @staticmethod
     def list_models() -> None:
         """Print available pretrained models.
@@ -234,9 +341,37 @@ class Prophet:
         Example:
             >>> models = Prophet.available_models()
             >>> print(list(models.keys()))
-            ['prophet-base', 'prophet-large', 'prophet-finetuned']
+            ['prophet-base', 'prophet-gdsc', 'prophet-ctrp']
         """
         return list_available_models()
+
+    @staticmethod
+    def available_datasets() -> List[str]:
+        """Get list of available datasets for training-specific models.
+
+        Returns:
+            List of dataset names available in the HuggingFace repository.
+
+        Example:
+            >>> datasets = Prophet.available_datasets()
+            >>> print(datasets)
+            ['CTRP', 'GDSC', 'GDSCcomb', 'Horlbeck', 'JUMP', 'LINCS', 'SCORE']
+        """
+        return get_available_datasets()
+
+    @staticmethod
+    def available_splits() -> List[str]:
+        """Get list of available split methods used during training.
+
+        Returns:
+            List of split method names.
+
+        Example:
+            >>> splits = Prophet.available_splits()
+            >>> print(splits)
+            ['leave_cl_out', 'leave_iv_out', 'leave_both_out', ...]
+        """
+        return get_available_splits()
 
     def _build_model(self, arch, model_config=None):
         if arch == "RandomForest":
