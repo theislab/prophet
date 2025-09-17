@@ -188,7 +188,7 @@ class DataProcessor:
         df: pd.DataFrame,
         readout_col: str = "value",
         method: Literal["minmax", "standard", "robust"] = "minmax",
-        clip_outliers: bool = True,
+        clip_outliers: bool = False,
         outlier_percentiles: Tuple[float, float] = (1, 99),
     ) -> Tuple[pd.DataFrame, object]:
         """Normalize readout values for better model performance.
