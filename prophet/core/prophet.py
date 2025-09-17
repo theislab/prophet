@@ -4,8 +4,8 @@ from pytorch_lightning.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
     LearningRateMonitor,
-    HitRatioCallback,
 )
+from ..utils.callbacks import HitRatioCallback
 import numpy as np
 import pandas as pd
 from typing import List, Union, Optional, Dict
