@@ -27,9 +27,12 @@ from .experimental_space import (
 from .model_hub import (
     list_available_models,
     download_model_files,
+    download_custom_model,
     get_model_info,
     print_available_models,
     check_model_availability,
+    get_available_datasets,
+    get_available_splits,
 )
 
 from .callbacks import R2ScoreCallback, CosineWarmupScheduler, HitRatioCallback
@@ -50,9 +53,12 @@ __all__ = [
     # Model hub
     "list_available_models",
     "download_model_files",
+    "download_custom_model",
     "get_model_info",
     "print_available_models",
     "check_model_availability",
+    "get_available_datasets",
+    "get_available_splits",
     "R2ScoreCallback",
     "CosineWarmupScheduler",
     "HitRatioCallback",

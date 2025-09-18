@@ -413,9 +413,9 @@ class HitRatioCallback(pl.Callback):
         self.val_dataset_indices.append(dataset_indices.detach().cpu())
 
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        if self.index_to_cl_name is None:
-            if not self._initialize_mappings(trainer, "test"):
-                return
+        # Always reinitialize mappings for test dataset to ensure correct indices
+        if not self._initialize_mappings(trainer, "test"):
+            return
 
         y_pred, y_true = outputs["y_pred"], outputs["y_true"]
 
