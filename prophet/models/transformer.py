@@ -77,7 +77,7 @@ class TransformerPredictor(pl.LightningModule):
 
     def _create_model(self):
         self.learnable_embedding = torch.nn.Embedding(
-            num_embeddings=2000,
+            num_embeddings=1000,
             embedding_dim=self.hparams.model_dim,
             max_norm=0.5,
         )
