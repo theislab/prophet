@@ -29,6 +29,7 @@ from ..utils import (
 from pytorch_lightning.loggers import WandbLogger
 import torch.optim as optim
 import types
+from sklearn.model_selection import train_test_split
 
 
 def inherit_docs_and_signature(from_method):
@@ -566,14 +567,15 @@ class Prophet:
             - For Transformer models, the method performs fine-tuning on a pre-trained checkpoint
             - If val_df is not provided, data is automatically split 90/10 for training/validation
             - Duplicate entries are automatically removed
-            - Missing embeddings are automatically filtered out with warnings
+            - Missing embeddings are automatically filtered out with warnings -> IMPLEMENTATION ASSIGNED TO  validate_prophet_inputs
         """
 
         self._init_input(iv_col, cl_col, ph_col, readout_col)
 
         # Data should already be clean and validated at this point
         df = df.rename(columns=self.column_map).copy()
-        val_df = val_df.rename(columns=self.column_map).copy()
+        if val_df is not None:
+            val_df = val_df.rename(columns=self.column_map).copy()
 
         if test_df is not None:
             test_df = test_df.rename(columns=self.column_map).copy()
@@ -586,11 +588,29 @@ class Prophet:
             test_indices = []
 
         # Combine all data
-        combined_data = pd.concat([df, val_df, test_df], ignore_index=True)
+        data_to_combine = [df]
+        if val_df is not None:
+            data_to_combine.append(val_df)
+        if test_df is not None and len(test_df) > 0:
+            data_to_combine.append(test_df)
+        
+        combined_data = pd.concat(data_to_combine, ignore_index=True)
 
         # Create indices for the combined dataset
-        train_indices = np.arange(len(df))
-        valid_indices = np.arange(len(df), len(df) + len(val_df))
+        if val_df is not None:
+            # Use provided validation data
+            train_indices = np.arange(len(df))
+            valid_indices = np.arange(len(df), len(df) + len(val_df))
+        else:
+            # Automatically split training data 90/10 for training/validation
+            train_idx, valid_idx = train_test_split(
+                np.arange(len(df)), 
+                test_size=0.1, 
+                random_state=42, 
+                shuffle=True
+            )
+            train_indices = train_idx
+            valid_indices = valid_idx
 
         print("Fitting model.")
         if not self.torch_dataset:
@@ -817,6 +837,8 @@ class Prophet:
                 monitor="R2_validation", mode="max", patience=10, min_delta=0.0
             )
 
+            callbacks = [r2_callback, model_checkpointer, lr_monitor, early_stopping]
+            
             if wandb_config is None:
                 wandb_config = {}
 
@@ -872,7 +894,7 @@ class Prophet:
                 f"Dataset sizes:\n"
                 f"  Training:    {len(split[0].dataset.labels):,d} samples\n"
                 f"  Validation:  {len(split[1].dataset.labels):,d} samples\n"
-                f"  Test:        {len(split[2].dataset.labels):,d} samples"
+                f"  Test:        {len(split[2].dataset.labels) if split[2] is not None else 0:,d} samples"
             )
             trainer.fit(
                 model=model, train_dataloaders=split[0], val_dataloaders=split[1]
