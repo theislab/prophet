@@ -3,13 +3,11 @@ leaveout_method: NULL
 
 project_name: FT_Prophet
 pert_len: 2
-ckpt_path: /lustre/groups/ml01/projects/super_rad_project/pretrained_prophet/everything/iv_0_iv_out_multitest_300cl_1219iv_512model_8layers_Falsesimpler_Truemask_0.0001lr_Falseexplicitphenotype_10000warmup_150001max_iters_Falseunbalanced_0.01wd_4096bs_Falseft/iv_0_seed_2024/epoch=29.ckpt
+ckpt_path: /lustre/groups/ml01/projects/super_rad_project/pretrained_prophet/GDSC/cl_0_TrainedOn545_cl_out_300cl_1219iv_512model_8layers_Falsesimpler_Truemask_0.0001lr_Falseexplicitphenotype_5000warmup_40000max_iters_Falseunbalanced_0.01wd_2048bs_Trueft/cl_0_TrainedOn545_seed_1995/epoch=27-step=2688.ckpt
 fine_tune: True
 
-cell_lines_prior: ['../embs/cell_line_embedding_full_ccle_300_scaled.csv']
-genes_prior: [ '../embs/global_iv_scaledv3.csv',
-'../embs/CTRP_with_smiles_simscaled.csv',
-'../embs/Hadian_plates_NEW_simscaled.csv']
+cell_lines_prior: ['/lustre/groups/ml01/projects/super_rad_project/cell_line_embeddings/cell_line_embedding_full_ccle_300_scaled.csv']
+genes_prior: [ '/lustre/groups/ml01/projects/super_rad_project/intervention_embeddings/global_iv_scaledv3.csv']
 max_steps: 1000
 batch_size: 256
 
