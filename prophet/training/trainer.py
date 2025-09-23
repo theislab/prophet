@@ -1266,7 +1266,7 @@ class ProphetTrainer:
             ph_col=data_config["ph_col"],
             readout_col=readout_col,
             model_config=prophet_config,
-            wandb_config={**self.config["wandb"], "name": "split_name"},
+            wandb_config={**self.config["wandb"], 'name':split_name},
             checkpoint_dirpath=checkpoint_dirpath,
         )
 
