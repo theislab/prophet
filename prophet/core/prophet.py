@@ -29,6 +29,7 @@ from ..utils import (
 from pytorch_lightning.loggers import WandbLogger
 import torch.optim as optim
 import types
+import wandb
 
 
 def inherit_docs_and_signature(from_method):
@@ -852,7 +853,6 @@ class Prophet:
             ]
 
             trainer = pl.Trainer(
-                min_epochs=1,
                 max_steps=model_config.max_steps,
                 accelerator="gpu",
                 devices=-1,
@@ -874,6 +874,7 @@ class Prophet:
                 f"  Validation:  {len(split[1].dataset.labels):,d} samples\n"
                 f"  Test:        {len(split[2].dataset.labels):,d} samples"
             )
+
             trainer.fit(
                 model=model, train_dataloaders=split[0], val_dataloaders=split[1]
             )
@@ -895,6 +896,8 @@ class Prophet:
                 )  # split[2] is already test dataloader
                 print("✅ Test set evaluation completed!")
                 print(f"   Test metrics: {test_results}")
+                
+            wandb.finish()
 
     def _generate_predict_df(
         self,
