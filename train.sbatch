@@ -12,6 +12,6 @@
 #SBATCH --exclude=gpusrv35
 
 source /home/icb/alejandro.tejada/.bashrc
-micromamba activate prophet
+micromamba activate prophettest3
 
-python scripts/train.py --config configs/pretraining.yaml
+python -u scripts/train.py --config configs/pretraining.yaml

@@ -569,7 +569,9 @@ class Prophet:
             - Duplicate entries are automatically removed
             - Missing embeddings are automatically filtered out with warnings
         """
-
+        print(
+            f"=== TRAIN BEGINNING - Torch RNG state: {torch.get_rng_state()[:10].tolist()}"
+        )
         self._init_input(iv_col, cl_col, ph_col, readout_col)
 
         # Data should already be clean and validated at this point
@@ -874,7 +876,11 @@ class Prophet:
                 f"  Validation:  {len(split[1].dataset.labels):,d} samples\n"
                 f"  Test:        {len(split[2].dataset.labels):,d} samples"
             )
-
+            train_dataloader = split[0]
+            print(
+                "Indices in first batch:",
+                train_dataloader.batch_sampler.__iter__().__next__(),
+            )
             trainer.fit(
                 model=model, train_dataloaders=split[0], val_dataloaders=split[1]
             )
@@ -896,7 +902,7 @@ class Prophet:
                 )  # split[2] is already test dataloader
                 print("✅ Test set evaluation completed!")
                 print(f"   Test metrics: {test_results}")
-                
+
             wandb.finish()
 
     def _generate_predict_df(

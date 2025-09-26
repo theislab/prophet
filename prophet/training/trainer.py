@@ -1246,6 +1246,9 @@ class ProphetTrainer:
             )
             print(f"   These will not be scaled. Consider adjusting your data splits.")
 
+        # Save the current torch random state
+        saved_torch_state = torch.get_rng_state()
+
         # Create Prophet instance with the pre-created config
         self.prophet_model = Prophet(
             iv_emb_path=self.iv_emb_paths,
@@ -1255,6 +1258,9 @@ class ProphetTrainer:
             architecture=self.config.get("architecture", "Transformer"),
             config=prophet_config,
         )
+
+        # Restore the torch random state to what it was before Prophet initialization
+        torch.set_rng_state(saved_torch_state)
 
         # Train the model with normalized data
         self.prophet_model.train(
@@ -1266,7 +1272,7 @@ class ProphetTrainer:
             ph_col=data_config["ph_col"],
             readout_col=readout_col,
             model_config=prophet_config,
-            wandb_config={**self.config["wandb"], 'name':split_name},
+            wandb_config={**self.config["wandb"], "name": split_name},
             checkpoint_dirpath=checkpoint_dirpath,
         )
 

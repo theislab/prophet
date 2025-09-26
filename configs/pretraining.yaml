@@ -4,7 +4,7 @@
 # === DATA CONFIGURATION ===
 data:
   # Use predefined setting from registry
-  setting: "everything"
+  setting: "GDSC"
   
   # Column specifications (always required)
   iv_cols: ["iv1", "iv2"]
@@ -35,34 +35,46 @@ wandb:
 
 # === MODEL CONFIGURATION ===
 # General training settings
-max_steps: 3000000
-batch_size: 8192
+max_steps: 200000
+batch_size: 2048
 early_stopping: true
-patience: 15
+patience: 20
 pert_len: 2
-r2_average: true
-unbalanced: true
+# r2_average: true
+# unbalanced: true
 
 Transformer:
-  dim_cl: 300
-  dim_iv: 1219
-  dim_phe: 300
-  model_dim: 512
-  num_heads: 8
-  num_layers: 8
-  simpler: false
-  lr: 0.0001
+  model_dim: 128
+  num_heads: 1
+  num_layers: 2
+  iv_dropout: 0.2
+  cl_dropout: 0.2
+  ph_dropout: 0.2
+  regressor_dropout: 0.2
+  lr: 0.0005
   weight_decay: 0.01
-  warmup: 5000
-  max_iters: 3000000
-  iv_dropout: 0.1
-  cl_dropout: 0.1
-  ph_dropout: 0.1
-  regressor_dropout: 0.1
-  dropout: 0.1
-  pool: cls
-  mask: true
-  sum: false
-  explicit_phenotype: false
-  linear_predictor: false
-  tokenizer_layers: 2
+  warmup: 10000
+  max_iters: 70000
+  dropout: 0.2
+  # dim_cl: 300
+  dim_iv: 1219
+  # dim_phe: 300
+  # model_dim: 512
+  # num_heads: 8
+  # num_layers: 8
+  # simpler: false
+  # lr: 0.0001
+  # weight_decay: 0.01
+  # warmup: 5000
+  # max_iters: 3000000
+  # iv_dropout: 0.1
+  # cl_dropout: 0.1
+  # ph_dropout: 0.1
+  # regressor_dropout: 0.1
+  # dropout: 0.1
+  # pool: cls
+  # mask: true
+  # sum: false
+  # explicit_phenotype: false
+  # linear_predictor: false
+  # tokenizer_layers: 2

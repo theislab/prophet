@@ -7,9 +7,9 @@ from functools import reduce
 import os
 from .dataset import PhenotypeDataset
 from tqdm import tqdm
+import torch
 
-
-SEED = 42  # the true, baseline seed (that sets test splits)
+SEED = 42
 
 
 def dataloader_phenotypes(
@@ -253,7 +253,6 @@ def dataloader_phenotypes(
         train_sampler = StratifiedPhenotypeSampler(
             data=data, indices=train_indices, batch_size=batch_size, key=key
         )
-        # Optimized training dataloader with stratified sampler
         train_dataloader = DataLoader(
             train_set,
             batch_sampler=train_sampler,
@@ -263,16 +262,14 @@ def dataloader_phenotypes(
             prefetch_factor=prefetch_factor,
         )
     else:
-        # Optimized training dataloader with regular sampler
         train_dataloader = DataLoader(
             train_set,
-            batch_size=batch_size,
+            batch_size=32,
             shuffle=True,
-            num_workers=optimal_workers,
+            num_workers=4,
             pin_memory=True,
             persistent_workers=True,
             prefetch_factor=prefetch_factor,
-            drop_last=True,  # Consistent batch sizes for better performance
         )
 
     if test_dict:
