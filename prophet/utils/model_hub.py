@@ -445,12 +445,12 @@ def download_model(
 
     repo_id = "theislab/Prophet"
 
-    checkpoint_name = get_checkpoint_name(dataset, split, fold, seed)
+    # Map "base" to "base_pretrained" for internal checkpoint lookup
+    dataset_internal = "base_pretrained" if dataset == "base" else dataset
 
-    if dataset == "base":
-        model_path = f"base_pretrained/unseen_{split}_fold_{fold}/seed_{seed}/{checkpoint_name}"
-    else:
-        model_path = f"{dataset}/unseen_{split}_fold_{fold}/seed_{seed}/{checkpoint_name}"
+    checkpoint_name = get_checkpoint_name(dataset_internal, split, fold, seed)
+
+    model_path = f"{dataset_internal}/unseen_{split}_fold_{fold}/seed_{seed}/{checkpoint_name}"
 
     if cache_dir is None:
         cache_dir = os.path.join(Path.home(), ".cache", "prophet",

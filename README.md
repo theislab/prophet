@@ -46,7 +46,7 @@ pip install -e .
 from prophet import Prophet
 
 # Load a pretrained model (automatically downloads everything)
-model = Prophet.from_pretrained("base_pretrained")
+model = Prophet.from_pretrained("base")
 
 # Ready to predict!
 predictions = model.predict(your_data)
