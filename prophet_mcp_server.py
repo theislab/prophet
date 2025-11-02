@@ -347,9 +347,9 @@ class ProphetMCPServer:
     async def _list_available_models(self) -> list[types.TextContent]:
         """List available Prophet models."""
         try:
-            models_info = Prophet.available_models()
+            configs = Prophet.available_models()
 
-            if not models_info:
+            if not configs:
                 return [
                     types.TextContent(
                         type="text",
@@ -357,18 +357,21 @@ class ProphetMCPServer:
                     )
                 ]
 
-            result = "📋 **Available Prophet Models:**\n\n"
-            for model_name, info in models_info.items():
-                result += f"**{model_name}**\n"
-                result += (
-                    f"  - Description: {info.get('description', 'No description')}\n"
-                )
-                result += f"  - Size: {info.get('size', 'Unknown')}\n"
-                result += (
-                    f"  - Architecture: {info.get('architecture', 'Transformer')}\n\n"
-                )
-
-            result += "\n💡 Use `load_prophet_model` with any of these model names to get started!"
+            result = "📋 **Available Prophet Model Configurations:**\n\n"
+            result += f"**Datasets:** {', '.join(configs['datasets'])}\n\n"
+            result += f"**Splits:** {', '.join(configs['splits'])}\n"
+            result += "  - `cell_lines`: Unseen cell lines split\n"
+            result += "  - `perturbations`: Unseen perturbations split\n\n"
+            result += f"**Folds:** {', '.join(map(str, configs['folds']))}\n\n"
+            result += f"**Seeds:** {', '.join(map(str, configs['seeds']))}\n\n"
+            result += "**Usage Examples:**\n"
+            result += "```python\n"
+            result += '# Load base pretrained model\n'
+            result += 'model = Prophet.from_pretrained("base")\n\n'
+            result += '# Load GDSC model with specific configuration\n'
+            result += 'model = Prophet.from_pretrained("GDSC", split="perturbations", fold=0, seed=110)\n'
+            result += "```\n\n"
+            result += "💡 Use `load_prophet_model` with these configurations to get started!"
 
             return [types.TextContent(type="text", text=result)]
 

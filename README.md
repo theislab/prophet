@@ -40,11 +40,56 @@ cd prophet
 pip install -e .
 ```
 
-## Usage
+## Quick Start
 
-### Downloading Resources
+```python
+from prophet import Prophet
 
-Model checkpoints and input embeddings can be downloaded [here](https://huggingface.co/datasets/aletlvl/Prophet_v1/tree/main) and [here](https://data.mendeley.com/datasets/g7z3pw3bfw). 
+# Load a pretrained model (automatically downloads everything)
+model = Prophet.from_pretrained("base_pretrained")
+
+# Ready to predict!
+predictions = model.predict(your_data)
+```
+
+### Available Models
+
+See all available models and configurations:
+```python
+Prophet.list_models()
+```
+
+Prophet provides pretrained models for various datasets including:
+- **base**: General purpose pretrained model (recommended for most users)
+- **GDSC, CTRP, PRISM**: Drug sensitivity datasets
+- **LINCS, JUMP**: Gene expression perturbation datasets
+- **Horlbeck**: CRISPR screening data
+- And more...
+
+Each model can be loaded with different configurations (split type, fold, seed):
+```python
+# Load with specific configuration
+model = Prophet.from_pretrained(
+    model_name="GDSC",
+    split="perturbations",  # or "cell_lines"
+    fold=0,  # 0-4
+    seed=110  # 110, 1995, or 2024
+)
+```
+
+### Tutorials and Examples
+
+For detailed examples and workflows, check out:
+- [Getting Started Tutorial](tutorials/getting_started.ipynb) - Complete walkthrough
+- [Fine-tuning Guide](tutorials/finetuning.ipynb) - Adapt models to your data
+
+### Advanced: Manual Download
+
+For advanced users who need direct file access, model checkpoints and embeddings are available at:
+- [HuggingFace Hub](https://huggingface.co/datasets/theislab/Prophet)
+- [Mendeley Data](https://data.mendeley.com/datasets/g7z3pw3bfw)
+
+## Citation
 
 If you have used our work in your research, please cite our [preprint](https://www.biorxiv.org/content/10.1101/2024.08.12.607533v2).
 

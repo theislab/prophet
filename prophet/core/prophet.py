@@ -8,7 +8,7 @@ from pytorch_lightning.callbacks import (
 from ..utils.callbacks import HitRatioCallback
 import numpy as np
 import pandas as pd
-from typing import List, Union, Optional, Dict
+from typing import List, Union, Optional, Dict, Tuple
 from ..utils import R2ScoreCallback
 import functools
 from joblib import load
@@ -19,12 +19,12 @@ from ..data import (
 )
 from ..models import load_models_config, TransformerPredictor
 from ..utils import (
-    download_model_files,
-    download_custom_model,
-    list_available_models,
+    download_model,
     print_available_models,
     get_available_datasets,
     get_available_splits,
+    get_available_seeds,
+    get_available_folds,
 )
 from pytorch_lightning.loggers import WandbLogger
 import torch.optim as optim
@@ -152,23 +152,68 @@ class Prophet:
                     )
 
     @classmethod
-    def from_pretrained(
+    def download_embeddings(
         cls,
-        model_name: str,
         cache_dir: Optional[str] = None,
         force_download: bool = False,
+    ) -> Tuple[str, str]:
+        """Download Prophet embeddings separately from model checkpoints.
+
+        This method provides explicit control over downloading embeddings,
+        allowing you to download them independently from model weights.
+        The embeddings are universal across all Prophet models.
+
+        Args:
+            cache_dir: Directory to cache downloaded files. If None, uses default cache.
+            force_download: Whether to force re-download even if files exist.
+
+        Returns:
+            Tuple of (intervention_emb_path, cell_line_emb_path)
+
+        Example:
+            Download embeddings separately:
+            >>> iv_emb, cl_emb = Prophet.download_embeddings()
+            >>> print(f"Intervention embeddings: {iv_emb}")
+            >>> print(f"Cell line embeddings: {cl_emb}")
+
+            Then use them to create a model:
+            >>> model = Prophet(
+            ...     iv_emb_path=iv_emb,
+            ...     cl_emb_path=cl_emb,
+            ...     model_pth="my_model.ckpt"
+            ... )
+        """
+        from prophet.utils.model_hub import download_embeddings as _download_embeddings
+        return _download_embeddings(cache_dir=cache_dir, force_download=force_download)
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        model_name: str = "base",
+        split: str = "cell_lines",
+        fold: int = 0,
+        seed: int = 110,
+        cache_dir: Optional[str] = None,
+        force_download: bool = False,
+        download_embeddings: bool = True,
         **kwargs,
     ) -> "Prophet":
         """Load a pretrained Prophet model from HuggingFace Hub.
 
-        This is the easiest way to get started with Prophet! Simply specify a model name
+        This is the easiest way to get started with Prophet! Simply specify a dataset name
         and all required files (model checkpoint, embeddings) will be automatically downloaded.
 
         Args:
-            model_name: Name of the pretrained model (e.g., "prophet-base", "prophet-large").
+            model_name: Dataset name (e.g., "base", "GDSC", "CTRP", "LINCS").
+                For backward compatibility, also accepts old names like "prophet-base".
                 Use Prophet.list_models() to see available options.
+            split: Split type - 'cell_lines' or 'perturbations' (default: 'cell_lines')
+            fold: Cross-validation fold number 0-4 (default: 0)
+            seed: Random seed - 110, 1995, or 2024 (default: 110)
             cache_dir: Directory to cache downloaded files. If None, uses default cache.
             force_download: Whether to force re-download even if files exist.
+            download_embeddings: Whether to download embeddings with the model (default: True).
+                Set to False if you want to manage embeddings separately using Prophet.download_embeddings().
             **kwargs: Additional arguments passed to Prophet constructor.
 
         Returns:
@@ -179,51 +224,67 @@ class Prophet:
             ConnectionError: If download fails.
 
         Examples:
-            Load a pretrained model for immediate use:
-            >>> model = Prophet.from_pretrained("prophet-base")
+            Load base pretrained model:
+            >>> model = Prophet.from_pretrained("base")
             >>> predictions = model.predict(data)
 
-            Use a different cache directory:
-            >>> model = Prophet.from_pretrained("prophet-large", cache_dir="/my/cache")
+            Load GDSC model with specific configuration:
+            >>> model = Prophet.from_pretrained("GDSC", split="perturbations", fold=0, seed=110)
+
+            Load CTRP model with different seed:
+            >>> model = Prophet.from_pretrained("CTRP", split="cell_lines", fold=2, seed=1995)
+
+            Download embeddings separately for better control:
+            >>> iv_emb, cl_emb = Prophet.download_embeddings()
+            >>> model = Prophet.from_pretrained("GDSC", split="perturbations", fold=0, seed=110,
+            ...                                 download_embeddings=False)
 
             See available models:
             >>> Prophet.list_models()
         """
-        print(f"🔄 Downloading {model_name} from HuggingFace Hub...")
+        legacy_mapping = {
+            "prophet-base": "base",
+            "prophet-gdsc": "GDSC",
+            "prophet-ctrp": "CTRP",
+            "prophet-lincs": "LINCS",
+            "prophet-jump": "JUMP",
+            "prophet-score": "SCORE",
+            "prophet-horlbeck": "Horlbeck",
+            "prophet-gdsc-comb": "GDSCcomb",
+        }
 
-        try:
-            # Download model and embedding files
-            model_path, gene_emb_path, cell_emb_path, phenotype_emb_path = (
-                download_model_files(
-                    model_name=model_name,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                )
+        dataset = legacy_mapping.get(model_name, model_name)
+
+        print(f"🔄 Downloading {dataset} model from HuggingFace Hub...")
+        print(f"   Configuration: split={split}, fold={fold}, seed={seed}")
+
+        model_path, gene_emb_path, cell_emb_path, phenotype_emb_path = (
+            download_model(
+                dataset=dataset,
+                split=split,
+                fold=fold,
+                seed=seed,
+                cache_dir=cache_dir,
+                force_download=force_download,
+                download_embeddings_flag=download_embeddings,
             )
+        )
 
-            # Initialize Prophet with downloaded files
-            return cls(
-                iv_emb_path=gene_emb_path,
-                cl_emb_path=cell_emb_path,
-                ph_emb_path=phenotype_emb_path,
-                model_pth=model_path,
-                **kwargs,
-            )
-
-        except Exception as e:
-            print(f"❌ Failed to load {model_name}: {str(e)}")
-            print("\nAvailable models:")
-            print_available_models()
-            raise
+        return cls(
+            iv_emb_path=gene_emb_path,
+            cl_emb_path=cell_emb_path,
+            ph_emb_path=phenotype_emb_path,
+            model_pth=model_path,
+            **kwargs,
+        )
 
     @classmethod
     def from_dataset(
         cls,
         dataset: str,
-        split: str = "leave_cl_out",
-        seed: int = 42,
+        split: str = "cell_lines",
         fold: int = 0,
-        unbalanced: bool = False,
+        seed: int = 110,
         cache_dir: Optional[str] = None,
         force_download: bool = False,
         **kwargs,
@@ -231,16 +292,14 @@ class Prophet:
         """Load a Prophet model trained on a specific dataset with custom parameters.
 
         This method allows you to load models with specific training configurations
-        from the structured HuggingFace repository (theislab/Prophet/dataset/split/seed/fold).
+        from the structured HuggingFace repository.
 
         Args:
             dataset: Dataset name (e.g., "GDSC", "CTRP", "LINCS", "JUMP", "SCORE", "Horlbeck", "GDSCcomb").
                 Use Prophet.available_datasets() to see all options.
-            split: Split method used during training (e.g., "leave_cl_out", "leave_iv_out").
-                Use Prophet.available_splits() to see all options.
-            seed: Random seed used during training (default: 42).
-            fold: Cross-validation fold number (default: 0).
-            unbalanced: Whether the model used unbalanced sampling during training (default: False).
+            split: Split type - 'cell_lines' or 'perturbations' (default: 'cell_lines')
+            fold: Cross-validation fold number 0-4 (default: 0)
+            seed: Random seed - 110, 1995, or 2024 (default: 110)
             cache_dir: Directory to cache downloaded files. If None, uses default cache.
             force_download: Whether to force re-download even if files exist.
             **kwargs: Additional arguments passed to Prophet constructor.
@@ -259,22 +318,23 @@ class Prophet:
             Load CTRP model with specific split and seed:
             >>> model = Prophet.from_dataset(
             ...     dataset="CTRP",
-            ...     split="leave_iv_out",
-            ...     seed=123,
+            ...     split="perturbations",
+            ...     seed=1995,
             ...     fold=2
             ... )
 
-            Load model trained with unbalanced sampling:
+            Load LINCS model with unseen cell lines:
             >>> model = Prophet.from_dataset(
             ...     dataset="LINCS",
-            ...     unbalanced=True
+            ...     split="cell_lines",
+            ...     fold=0,
+            ...     seed=110
             ... )
 
             See available datasets and splits:
             >>> Prophet.available_datasets()
             >>> Prophet.available_splits()
         """
-        # Validate inputs
         available_datasets = get_available_datasets()
         if dataset not in available_datasets:
             raise ValueError(
@@ -287,38 +347,26 @@ class Prophet:
                 f"Split '{split}' not available. Available splits: {available_splits}"
             )
 
-        print(
-            f"🔄 Downloading Prophet model: {dataset}/{split}/seed{seed}/fold{fold} from HuggingFace Hub..."
+        print(f"🔄 Downloading Prophet model: {dataset}/unseen_{split}_fold_{fold}/seed_{seed}")
+
+        model_path, gene_emb_path, cell_emb_path, phenotype_emb_path = (
+            download_model(
+                dataset=dataset,
+                split=split,
+                fold=fold,
+                seed=seed,
+                cache_dir=cache_dir,
+                force_download=force_download,
+            )
         )
 
-        try:
-            # Download model and embedding files with custom parameters
-            model_path, gene_emb_path, cell_emb_path, phenotype_emb_path = (
-                download_custom_model(
-                    dataset=dataset,
-                    split=split,
-                    seed=seed,
-                    fold=fold,
-                    unbalanced=unbalanced,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                )
-            )
-
-            # Initialize Prophet with downloaded files
-            return cls(
-                iv_emb_path=gene_emb_path,
-                cl_emb_path=cell_emb_path,
-                ph_emb_path=phenotype_emb_path,
-                model_pth=model_path,
-                **kwargs,
-            )
-
-        except Exception as e:
-            print(f"❌ Failed to load model from {dataset}: {str(e)}")
-            print(f"\nAvailable datasets: {available_datasets}")
-            print(f"Available splits: {available_splits}")
-            raise
+        return cls(
+            iv_emb_path=gene_emb_path,
+            cl_emb_path=cell_emb_path,
+            ph_emb_path=phenotype_emb_path,
+            model_pth=model_path,
+            **kwargs,
+        )
 
     @staticmethod
     def list_models() -> None:
@@ -333,18 +381,25 @@ class Prophet:
         print_available_models()
 
     @staticmethod
-    def available_models() -> Dict[str, Dict]:
-        """Get programmatic access to available models.
+    def available_models() -> Dict[str, List]:
+        """Get programmatic access to available model configurations.
 
         Returns:
-            Dictionary mapping model names to their metadata.
+            Dictionary with lists of available options for each parameter.
 
         Example:
-            >>> models = Prophet.available_models()
-            >>> print(list(models.keys()))
-            ['prophet-base', 'prophet-gdsc', 'prophet-ctrp']
+            >>> configs = Prophet.available_models()
+            >>> print(configs['datasets'])
+            ['CTRP', 'GDSC', 'GDSCcomb', 'Horlbeck', 'JUMP', 'LINCS', 'SCORE', ...]
+            >>> print(configs['splits'])
+            ['cell_lines', 'perturbations']
         """
-        return list_available_models()
+        return {
+            "datasets": get_available_datasets(),
+            "splits": get_available_splits(),
+            "folds": get_available_folds(),
+            "seeds": get_available_seeds()
+        }
 
     @staticmethod
     def available_datasets() -> List[str]:
@@ -370,9 +425,37 @@ class Prophet:
         Example:
             >>> splits = Prophet.available_splits()
             >>> print(splits)
-            ['leave_cl_out', 'leave_iv_out', 'leave_both_out', ...]
+            ['cell_lines', 'perturbations']
         """
         return get_available_splits()
+
+    @staticmethod
+    def available_seeds() -> List[int]:
+        """Get list of available random seeds used during training.
+
+        Returns:
+            List of seed values.
+
+        Example:
+            >>> seeds = Prophet.available_seeds()
+            >>> print(seeds)
+            [110, 1995, 2024]
+        """
+        return get_available_seeds()
+
+    @staticmethod
+    def available_folds() -> List[int]:
+        """Get list of available cross-validation folds.
+
+        Returns:
+            List of fold numbers (0-4).
+
+        Example:
+            >>> folds = Prophet.available_folds()
+            >>> print(folds)
+            [0, 1, 2, 3, 4]
+        """
+        return get_available_folds()
 
     def _build_model(self, arch, model_config=None):
         if arch == "RandomForest":
