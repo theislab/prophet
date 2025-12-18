@@ -200,7 +200,6 @@ class PhenotypeDataset(Dataset):
         Uses pre-computed integer indices for fast lookups.
         """
         # Get pre-computed indices for this sample
-        print(idx)
         item_indices = self.experimental_data_indices[idx]
         cell_line_idx = item_indices[0]
         phenotype_idx = item_indices[1]
