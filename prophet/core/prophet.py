@@ -1068,13 +1068,66 @@ class Prophet:
 
         Returns:
             DataFrame with predictions in 'pred' column.
+
+        Raises:
+            ValueError: If no valid rows remain after filtering invalid embeddings.
         """
-        # Data should already be clean and validated
-        # Just do basic column mapping
+        import warnings
 
         if self.column_map is not None:
             df = df.rename(columns=self.column_map).copy()
         df = df.reset_index(drop=True)
+
+        # Validate data against available embeddings
+        original_len = len(df)
+        available_cls = set(self.cl_embedding.index)
+        available_ivs = set(self.iv_embedding.index)
+        available_phs = set(self.phenotypes) if self.phenotypes else None
+
+        # Check cell lines
+        missing_cls = set(df["cell_line"].unique()) - available_cls
+        if missing_cls:
+            warnings.warn(
+                f"Found {len(missing_cls)} cell line(s) not in embeddings: {list(missing_cls)[:5]}"
+                f"{'...' if len(missing_cls) > 5 else ''}. These rows will be skipped."
+            )
+            df = df[df["cell_line"].isin(available_cls)]
+
+        # Check interventions
+        for iv_col in self.iv_cols:
+            if iv_col in df.columns:
+                missing_ivs = set(df[iv_col].unique()) - available_ivs
+                if missing_ivs:
+                    warnings.warn(
+                        f"Found {len(missing_ivs)} intervention(s) in '{iv_col}' not in embeddings: "
+                        f"{list(missing_ivs)[:5]}{'...' if len(missing_ivs) > 5 else ''}. These rows will be skipped."
+                    )
+                    df = df[df[iv_col].isin(available_ivs)]
+
+        # Check phenotypes
+        if available_phs is not None:
+            missing_phs = set(df["phenotype"].unique()) - available_phs
+            if missing_phs:
+                warnings.warn(
+                    f"Found {len(missing_phs)} phenotype(s) not in model: {list(missing_phs)}. "
+                    f"Available phenotypes: {list(available_phs)[:10]}. These rows will be skipped."
+                )
+                df = df[df["phenotype"].isin(available_phs)]
+
+        df = df.reset_index(drop=True)
+
+        # Check if any valid rows remain
+        if len(df) == 0:
+            raise ValueError(
+                "No valid rows remain after filtering. Check that your cell lines, "
+                "interventions, and phenotypes exist in the model's embeddings. "
+                f"Available cell lines: {len(available_cls)}, "
+                f"Available interventions: {len(available_ivs)}, "
+                f"Available phenotypes: {list(available_phs) if available_phs else 'any'}"
+            )
+
+        if len(df) < original_len:
+            print(f"Predicting on {len(df)}/{original_len} valid rows ({original_len - len(df)} rows filtered out)")
 
         # Add dummy value column for dataloader
         df["_"] = 0
